@@ -905,8 +905,10 @@ async function handleReloadExtensions(params) {
 
   if (!extensionName) {
     // Reload all extensions (just reload this one for now)
-    await browser.runtime.reload();
-    return { reloaded: [browser.runtime.getManifest().name] };
+    const name = browser.runtime.getManifest().name;
+    // Schedule reload after response is sent
+    setTimeout(() => browser.runtime.reload(), 100);
+    return { reloaded: [name] };
   }
 
   // Get all extensions
@@ -923,8 +925,8 @@ async function handleReloadExtensions(params) {
 
   // Check if it's this extension
   if (targetExtension.id === browser.runtime.id) {
-    // Reload this extension
-    await browser.runtime.reload();
+    // Reload this extension after response is sent
+    setTimeout(() => browser.runtime.reload(), 100);
     return { reloaded: [targetExtension.name] };
   } else {
     // Cannot reload other extensions in Firefox (security restriction)
