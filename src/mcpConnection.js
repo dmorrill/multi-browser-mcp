@@ -16,6 +16,7 @@
 
 const WebSocket = require('ws');
 const { randomUUID } = require('crypto');
+const { getLogger } = require('./fileLogger');
 
 // Helper function for debug logging
 function debugLog(...args) {
@@ -211,17 +212,18 @@ class MCPConnection {
     // Extract current tab info from result (not from message itself - that would be non-standard JSON-RPC)
     // Use 'in' operator to detect null values (tab detached) vs missing property
     const result = message.result || {};
-    console.error('[MCPConnection] Result keys:', Object.keys(result));
-    console.error('[MCPConnection] Checking for currentTab in result:', 'currentTab' in result);
-    console.error('[MCPConnection] this.onTabInfoUpdate exists:', !!this.onTabInfoUpdate);
-    console.error('[MCPConnection] currentTab value:', result.currentTab);
+    const logger = getLogger();
+    logger.log('[MCPConnection] Result keys:', Object.keys(result));
+    logger.log('[MCPConnection] Checking for currentTab in result:', 'currentTab' in result);
+    logger.log('[MCPConnection] this.onTabInfoUpdate exists:', !!this.onTabInfoUpdate);
+    logger.log('[MCPConnection] currentTab value:', result.currentTab);
 
     if ('currentTab' in result && this.onTabInfoUpdate) {
-      console.error('[MCPConnection] Calling onTabInfoUpdate with:', result.currentTab);
+      logger.log('[MCPConnection] Calling onTabInfoUpdate with:', result.currentTab);
       this.onTabInfoUpdate(result.currentTab);
-      console.error('[MCPConnection] onTabInfoUpdate callback completed');
+      logger.log('[MCPConnection] onTabInfoUpdate callback completed');
     } else {
-      console.error('[MCPConnection] NOT calling onTabInfoUpdate - condition failed');
+      logger.log('[MCPConnection] NOT calling onTabInfoUpdate - condition failed');
     }
 
     if (message.error) {

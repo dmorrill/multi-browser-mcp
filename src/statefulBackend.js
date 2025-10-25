@@ -37,6 +37,7 @@ class StatefulBackend {
     this._availableBrowsers = null; // Cached list of available browsers from proxy (when multiple found)
     this._connectedBrowserName = null; // Name of currently connected browser
     this._attachedTab = null; // Currently attached tab {index, title, url}
+    this._stealthMode = false; // Track if current tab is in stealth mode
     this._browserDisconnected = false; // Track if browser extension disconnected (proxy still connected)
     this._lastConnectedBrowserId = null; // Remember browser ID for auto-reconnect
     this._lastAttachedTab = null; // Remember last attached tab for auto-reattach
@@ -117,12 +118,18 @@ class StatefulBackend {
     // Tab - only show if browser not disconnected
     if (!this._browserDisconnected) {
       if (this._attachedTab) {
-        const tabTitle = this._attachedTab.title || 'Untitled';
-        const shortTitle = tabTitle.length > 40 ? tabTitle.substring(0, 37) + '...' : tabTitle;
-        parts.push(`📄 Tab ${this._attachedTab.index}: ${shortTitle}`);
+        // Show tab index and current URL (more useful than title for navigation tracking)
+        const url = this._attachedTab.url || 'about:blank';
+        const shortUrl = url.length > 50 ? url.substring(0, 47) + '...' : url;
+        parts.push(`📄 Tab ${this._attachedTab.index}: ${shortUrl}`);
       } else {
         parts.push(`⚠️ No tab attached`);
       }
+    }
+
+    // Stealth mode - only show if enabled
+    if (this._stealthMode) {
+      parts.push(`🕵️ Stealth`);
     }
 
     return parts.join(' | ') + '\n---\n\n';
@@ -226,9 +233,25 @@ class StatefulBackend {
     const dummyBackend = new UnifiedBackend(this._config, null);
     const browserTools = await dummyBackend.listTools();
 
-    debugLog(`[StatefulBackend] Returning ${connectionTools.length} connection tools + ${browserTools.length} browser tools`);
+    // Add debug tools if debug mode is enabled
+    const debugTools = [];
+    if (this._debugMode) {
+      debugTools.push({
+        name: 'reload_mcp',
+        description: 'Reload the MCP server without disconnecting. Only available in debug mode. The server will exit with code 42, causing the wrapper to restart it.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+        annotations: {
+          title: 'Reload MCP server',
+          readOnlyHint: false,
+          destructiveHint: true,
+          openWorldHint: false
+        }
+      });
+    }
 
-    return [...connectionTools, ...browserTools];
+    debugLog(`[StatefulBackend] Returning ${connectionTools.length} connection tools + ${browserTools.length} browser tools + ${debugTools.length} debug tools`);
+
+    return [...connectionTools, ...browserTools, ...debugTools];
   }
 
   async callTool(name, rawArguments) {
@@ -250,6 +273,9 @@ class StatefulBackend {
 
       case 'auth':
         return await this._handleAuth(rawArguments);
+
+      case 'reload_mcp':
+        return await this._handleReloadMCP();
     }
 
     // Forward to active backend
@@ -976,6 +1002,32 @@ class StatefulBackend {
           isError: true
         };
     }
+  }
+
+  async _handleReloadMCP() {
+    if (!this._debugMode) {
+      return {
+        content: [{
+          type: 'text',
+          text: '### Error\n\nreload_mcp is only available in debug mode. Start the server with --debug flag.'
+        }],
+        isError: true
+      };
+    }
+
+    debugLog('[StatefulBackend] Reload requested, exiting with code 42...');
+
+    // Send success response before exiting
+    setTimeout(() => {
+      process.exit(42);  // Exit code 42 triggers wrapper to restart
+    }, 100);
+
+    return {
+      content: [{
+        type: 'text',
+        text: '### ✅ Reloading MCP Server\n\nThe server will restart momentarily...'
+      }]
+    };
   }
 
   async _handleLogin() {

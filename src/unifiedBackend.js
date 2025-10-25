@@ -705,10 +705,13 @@ class UnifiedBackend {
       // Store attached tab info for status tracking
       if (this._statefulBackend) {
         this._statefulBackend._attachedTab = {
+          id: result.tab?.id,  // Add id field for onTabInfoUpdate matching
           index: tabIndex,
           title: result.tab?.title || newTab?.title,
           url: args.url || 'about:blank'
         };
+        // Track stealth mode
+        this._statefulBackend._stealthMode = args.stealth || false;
       }
 
       return {
@@ -730,10 +733,13 @@ class UnifiedBackend {
       // Store attached tab info for status tracking
       if (this._statefulBackend) {
         this._statefulBackend._attachedTab = {
+          id: result.tab?.id,  // Add id field for onTabInfoUpdate matching
           index: args.index,
           title: result.tab?.title,
           url: result.tab?.url
         };
+        // Track stealth mode
+        this._statefulBackend._stealthMode = args.stealth || false;
       }
 
       return {
