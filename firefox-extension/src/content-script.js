@@ -127,6 +127,14 @@ function detectTechStack() {
       stack.frameworks.push('Google Wiz');
       stack.spa = true;
     }
+    // Polymer - Google's web components library (used on YouTube, etc.)
+    if (window.Polymer ||
+        document.querySelector('iron-iconset-svg') ||
+        document.querySelector('ytd-app') ||
+        document.querySelector('[is^="iron-"], [is^="paper-"], [is^="ytd-"]')) {
+      stack.frameworks.push('Polymer');
+      stack.spa = true;
+    }
 
     // JS Libraries
     if (window.jQuery || window.$) {
