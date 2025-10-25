@@ -781,7 +781,8 @@ async function handleCDPCommand(params) {
           id: navigatedTab.id,
           title: navigatedTab.title,
           url: navigatedTab.url,
-          index: previousIndex
+          index: previousIndex,
+          techStack: attachedTabInfo.techStack || null
         }
       };
       logAlways('[Background] Returning from Page.navigate:', JSON.stringify(result));
@@ -1281,10 +1282,25 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       techStackInfo[sender.tab.id] = message.stack;
       log('[Background] Tech stack detected for tab', sender.tab.id, ':', message.stack);
 
-      // If this is the attached tab, update attachedTabInfo
-      if (sender.tab.id === attachedTabId && attachedTabInfo) {
+      // If this is the attached tab, update attachedTabInfo and notify MCP
+      if (sender.tab.id === attachedTabId && attachedTabInfo && socket && isConnected) {
         attachedTabInfo.techStack = message.stack;
-        log('[Background] Updated attached tab tech stack');
+        log('[Background] Updated attached tab tech stack, notifying MCP server');
+
+        // Send notification to MCP server with updated tab info
+        socket.send(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'notifications/tab_info_update',
+          params: {
+            currentTab: {
+              id: attachedTabInfo.id,
+              title: attachedTabInfo.title,
+              url: attachedTabInfo.url,
+              index: attachedTabInfo.index,
+              techStack: message.stack
+            }
+          }
+        }));
       }
     }
   }
