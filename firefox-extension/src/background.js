@@ -37,6 +37,7 @@ let isConnected = false;
 let attachedTabId = null; // Currently attached tab ID
 let attachedTabInfo = null; // Currently attached tab info {id, title, url}
 let projectName = null; // MCP project name from client_id
+let stealthMode = null; // Stealth mode status (true/false/null)
 let pendingDialogResponse = null; // Stores response for next dialog (accept, text)
 let consoleMessages = []; // Stores console messages from the page
 let networkRequests = []; // Stores network requests for tracking
@@ -285,6 +286,43 @@ async function autoConnect() {
             projectName = message.params.client_id;
             log('[Background] Project name set:', projectName);
           }
+          if (message.method === 'connection_status' && message.params) {
+            // Store connection status for popup display
+            const status = {
+              max_connections: message.params.max_connections,
+              connections_used: message.params.connections_used,
+              connections_to_this_browser: message.params.connections_to_this_browser
+            };
+            await browser.storage.local.set({ connectionStatus: status });
+            log('[Background] Connection status updated:', status);
+
+            // Extract project_name from active_connections if available (matching Chrome)
+            if (message.params.active_connections && message.params.active_connections.length > 0) {
+              const firstConnection = message.params.active_connections[0];
+              // Try different field names: project_name, mcp_client_id, client_id, clientID, name
+              let extractedProjectName = firstConnection.project_name ||
+                                         firstConnection.mcp_client_id ||
+                                         firstConnection.client_id ||
+                                         firstConnection.clientID ||
+                                         firstConnection.name;
+
+              // Strip "mcp-" prefix if present
+              if (extractedProjectName && extractedProjectName.startsWith('mcp-')) {
+                extractedProjectName = extractedProjectName.substring(4); // Remove "mcp-"
+              }
+
+              if (extractedProjectName) {
+                log('[Background] Project name from connection_status:', extractedProjectName);
+                projectName = extractedProjectName;
+                // Broadcast status change to popup
+                browser.runtime.sendMessage({ type: 'statusChanged' }).catch(() => {});
+              } else {
+                log('[Background] No project name found in connection. firstConnection:', firstConnection);
+              }
+            } else {
+              log('[Background] No active_connections in params');
+            }
+          }
           return; // Don't send response for notifications
         }
 
@@ -439,6 +477,7 @@ async function handleGetTabs() {
 async function handleCreateTab(params) {
   const url = params.url || 'about:blank';
   const activate = params.activate !== false;
+  const stealth = params.stealth ?? false;
 
   // Create new tab
   const tab = await browser.tabs.create({
@@ -446,13 +485,24 @@ async function handleCreateTab(params) {
     active: activate
   });
 
+  // Set stealth mode
+  stealthMode = stealth;
+
+  // Get all tabs to find the index of the newly created tab
+  const allTabs = await browser.tabs.query({});
+  const tabIndex = allTabs.findIndex(t => t.id === tab.id);
+
   // Auto-attach to the new tab
   attachedTabId = tab.id;
   attachedTabInfo = {
     id: tab.id,
     title: tab.title,
-    url: tab.url
+    url: tab.url,
+    index: tabIndex >= 0 ? tabIndex : undefined
   };
+
+  // Update badge for the new tab (badge color reflects stealth mode)
+  await updateBadgeForTab(tab.id);
 
   // Inject console capture and dialog overrides
   await injectConsoleCapture(tab.id);
@@ -465,6 +515,7 @@ async function handleCreateTab(params) {
 async function handleSelectTab(params) {
   const tabIndex = params.tabIndex;
   const activate = params.activate !== false;
+  const stealth = params.stealth ?? false;
 
   // Get all tabs
   const allTabs = await browser.tabs.query({});
@@ -487,13 +538,26 @@ async function handleSelectTab(params) {
     await browser.windows.update(selectedTab.windowId, { focused: true });
   }
 
+  // Clear badge from old tab if there was one
+  const oldTabId = attachedTabId;
+  if (oldTabId && oldTabId !== selectedTab.id) {
+    await clearBadge(oldTabId);
+  }
+
+  // Set stealth mode
+  stealthMode = stealth;
+
   // Attach to this tab
   attachedTabId = selectedTab.id;
   attachedTabInfo = {
     id: selectedTab.id,
     title: selectedTab.title,
-    url: selectedTab.url
+    url: selectedTab.url,
+    index: tabIndex  // Use the tabIndex parameter
   };
+
+  // Update badge for the new tab (badge color reflects stealth mode)
+  await updateBadgeForTab(selectedTab.id);
 
   // Inject console capture and dialog overrides
   await injectConsoleCapture(selectedTab.id);
@@ -671,8 +735,53 @@ async function handleCDPCommand(params) {
   switch (method) {
     case 'Page.navigate':
       // Navigate to URL using Firefox tabs.update
-      await browser.tabs.update(attachedTabId, { url: cdpParams.url });
-      return {};
+      const targetUrl = cdpParams.url;
+      await browser.tabs.update(attachedTabId, { url: targetUrl });
+
+      // Wait for navigation to complete
+      logAlways('[Background] Waiting for navigation to:', targetUrl);
+      await new Promise((resolve) => {
+        const listener = (details) => {
+          logAlways('[Background] webNavigation.onCompleted:', details.tabId, details.url, details.frameId);
+          if (details.tabId === attachedTabId && details.url === targetUrl && details.frameId === 0) {
+            logAlways('[Background] Navigation completed to target URL');
+            browser.webNavigation.onCompleted.removeListener(listener);
+            resolve();
+          }
+        };
+        browser.webNavigation.onCompleted.addListener(listener);
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          logAlways('[Background] Navigation timeout - proceeding anyway');
+          browser.webNavigation.onCompleted.removeListener(listener);
+          resolve();
+        }, 10000);
+      });
+
+      // Get updated tab info
+      const navigatedTab = await browser.tabs.get(attachedTabId);
+
+      // Update cached tab info - preserve existing index since navigation doesn't change tab position
+      const previousIndex = attachedTabInfo?.index;
+      attachedTabInfo = {
+        id: navigatedTab.id,
+        title: navigatedTab.title,
+        url: navigatedTab.url,
+        index: previousIndex  // Preserve index from when tab was attached
+      };
+
+      // Return currentTab so server can update its cached state
+      const result = {
+        currentTab: {
+          id: navigatedTab.id,
+          title: navigatedTab.title,
+          url: navigatedTab.url,
+          index: previousIndex
+        }
+      };
+      logAlways('[Background] Returning from Page.navigate:', JSON.stringify(result));
+      return result;
 
     case 'Page.reload':
       // Reload page using Firefox tabs.reload
@@ -884,6 +993,9 @@ async function handleOpenTestPage() {
   const testPageUrl = browser.runtime.getURL('test.html');
   const tab = await browser.tabs.create({ url: testPageUrl, active: true });
 
+  // Test page always uses non-stealth mode
+  stealthMode = false;
+
   // Auto-attach to the test page tab
   attachedTabId = tab.id;
   attachedTabInfo = {
@@ -891,6 +1003,9 @@ async function handleOpenTestPage() {
     title: 'Browser Interaction Test Page',
     url: testPageUrl
   };
+
+  // Update badge for the test page tab
+  await updateBadgeForTab(tab.id);
 
   // Inject console capture and dialog overrides
   await injectConsoleCapture(tab.id);
@@ -1018,6 +1133,93 @@ async function injectConsoleCapture(tabId) {
   }
 }
 
+// Badge update functions (matching Chrome implementation)
+async function updateBadgeForTab(tabId) {
+  // Firefox has 4-character limit for badge text, use simple checkmark
+  // Note: Firefox may not render Unicode well in badges, might show as box
+  const text = '✓';
+  const color = stealthMode ? '#666666' : '#1c75bc'; // Gray for stealth, blue for normal
+  const title = stealthMode ? 'Connected (Stealth Mode)' : 'Connected to MCP client';
+  await updateBadge(tabId, { text, color, title });
+}
+
+async function updateBadge(tabId, { text, color, title }) {
+  try {
+    logAlways('[Background] Setting badge - tabId:', tabId, 'text:', text, 'color:', color, 'title:', title);
+
+    // Firefox manifest v2 may not support per-tab badges reliably
+    // Try setting globally first, then per-tab
+    try {
+      // Set globally (no tabId)
+      await browser.browserAction.setBadgeText({ text });
+      logAlways('[Background] setBadgeText (global) succeeded');
+    } catch (e) {
+      logAlways('[Background] setBadgeText (global) failed:', e.message);
+    }
+
+    // Try per-tab as well
+    try {
+      await browser.browserAction.setBadgeText({ tabId, text });
+      logAlways('[Background] setBadgeText (per-tab) succeeded');
+    } catch (e) {
+      logAlways('[Background] setBadgeText (per-tab) failed:', e.message);
+    }
+
+    // Try setting title globally
+    try {
+      await browser.browserAction.setTitle({ title: title || '' });
+      logAlways('[Background] setTitle (global) succeeded');
+    } catch (e) {
+      logAlways('[Background] setTitle (global) failed:', e.message);
+    }
+
+    // Try setting background color globally
+    if (color) {
+      try {
+        await browser.browserAction.setBadgeBackgroundColor({ color });
+        logAlways('[Background] setBadgeBackgroundColor (global) succeeded');
+      } catch (e) {
+        logAlways('[Background] setBadgeBackgroundColor (global) failed:', e.message);
+      }
+    }
+
+    logAlways('[Background] Badge update complete');
+  } catch (error) {
+    // Log errors so we can debug
+    logAlways('[Background] Badge update error:', error.message, error.stack);
+  }
+}
+
+async function clearBadge(tabId) {
+  await updateBadge(tabId, { text: '' });
+}
+
+// Listen for tab activation to update badge based on current tab
+browser.tabs.onActivated.addListener(async (activeInfo) => {
+  log('[Background] Tab activated:', activeInfo.tabId);
+
+  // Check if the activated tab is the attached tab
+  if (activeInfo.tabId === attachedTabId) {
+    // Show badge for attached tab
+    await updateBadgeForTab(activeInfo.tabId);
+    log('[Background] Badge shown for attached tab');
+  } else {
+    // Clear badge for non-attached tabs
+    await clearBadge(activeInfo.tabId);
+    log('[Background] Badge cleared for non-attached tab');
+  }
+});
+
+// Listen for tab close to clear badge if attached tab is closed
+browser.tabs.onRemoved.addListener(async (tabId) => {
+  if (tabId === attachedTabId) {
+    log('[Background] Attached tab closed, clearing badge');
+    await clearBadge(tabId);
+    attachedTabId = null;
+    attachedTabInfo = null;
+  }
+});
+
 // Listen for tab navigation to re-inject dialog overrides on the attached tab
 browser.webNavigation.onCompleted.addListener(async (details) => {
   // Only re-inject if this is the attached tab and it's the main frame
@@ -1040,7 +1242,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({
       connected: isConnected,
       connectedTabId: attachedTabId,
-      stealthMode: null, // Firefox doesn't support stealth mode yet
+      stealthMode: stealthMode,
       projectName: projectName
     });
   } else if (message.type === 'loginSuccess') {

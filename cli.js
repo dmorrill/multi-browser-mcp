@@ -27,6 +27,9 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const { Command } = require('commander');
 const { StatefulBackend } = require('./src/statefulBackend');
+const { spawn } = require('child_process');
+const { PassThrough } = require('stream');
+const { getLogger } = require('./src/fileLogger');
 
 const packageJSON = require('./package.json');
 
@@ -39,6 +42,74 @@ function resolveConfig(options) {
       version: packageJSON.version
     }
   };
+}
+
+// Wrapper mode - spawns child process and monitors for reload (exit code 42)
+function runAsWrapper() {
+  console.error('[Wrapper] Starting in wrapper mode with auto-reload enabled');
+  console.error('[Wrapper] Press Ctrl+C to exit');
+
+  const inputBuffer = new PassThrough();
+  const outputBuffer = new PassThrough();
+
+  // Pipe stdin to input buffer
+  process.stdin.pipe(inputBuffer);
+
+  // Pipe output buffer to stdout
+  outputBuffer.pipe(process.stdout);
+
+  function spawnChild() {
+    console.error('[Wrapper] Starting MCP server...');
+
+    // Spawn child with --child flag to indicate it's the inner process
+    const args = process.argv.slice(2).filter(arg => arg !== '--debug');
+    args.push('--child');
+
+    const child = spawn(process.execPath, [__filename, ...args], {
+      stdio: ['pipe', 'pipe', 'inherit']
+    });
+
+    // Proxy buffered input to child
+    inputBuffer.pipe(child.stdin);
+
+    // Proxy child output to buffer
+    child.stdout.pipe(outputBuffer, { end: false });
+
+    child.on('exit', (code, signal) => {
+      console.error(`[Wrapper] Child exited (code=${code}, signal=${signal})`);
+
+      // Unpipe to prevent write-after-end errors
+      inputBuffer.unpipe(child.stdin);
+      child.stdout.unpipe(outputBuffer);
+
+      // Check if this was an intentional reload (exit code 42)
+      if (code === 42) {
+        console.error('[Wrapper] Reload requested, restarting...');
+        setTimeout(() => spawnChild(), 100);
+      } else {
+        console.error('[Wrapper] Server terminated, shutting down');
+        process.exit(code || 0);
+      }
+    });
+
+    child.on('error', (err) => {
+      console.error(`[Wrapper] Child error: ${err.message}`);
+      process.exit(1);
+    });
+
+    // Handle signals
+    process.on('SIGTERM', () => {
+      child.kill();
+      process.exit(0);
+    });
+
+    process.on('SIGINT', () => {
+      child.kill();
+      process.exit(0);
+    });
+  }
+
+  spawnChild();
 }
 
 // Simple exit watchdog
@@ -74,10 +145,14 @@ async function main(options) {
   // Store debug mode globally for access by other modules
   global.DEBUG_MODE = options.debug === true;
 
+  // Enable file logging in debug mode
+  const logger = getLogger();
   if (global.DEBUG_MODE) {
-    console.error('[cli.js] Starting MCP server in PASSIVE mode (no connections)');
-    console.error('[cli.js] Use connect tool to activate');
-    console.error('[cli.js] Debug mode: ENABLED');
+    logger.enable();
+    logger.log('[cli.js] Starting MCP server in PASSIVE mode (no connections)');
+    logger.log('[cli.js] Use connect tool to activate');
+    logger.log('[cli.js] Debug mode: ENABLED');
+    logger.log('[cli.js] Log file: mcp-debug.log');
   }
 
   const config = resolveConfig(options);
@@ -148,7 +223,20 @@ program
   .name('Blueprint MCP for Chrome')
   .description('MCP server for Chrome browser automation using the Blueprint MCP extension')
   .option('--debug', 'Enable debug mode (shows reload/extension tools and verbose logging)')
+  .option('--child', 'Internal flag: indicates this is a child process spawned by wrapper')
   .action(async (options) => {
+    // If --debug and NOT --child: run as wrapper (parent process)
+    if (options.debug && !options.child) {
+      runAsWrapper();
+      return;
+    }
+
+    // Otherwise: run as normal MCP server (either child or non-debug mode)
+    if (options.child) {
+      // Child process inherits debug mode from parent
+      options.debug = true;
+    }
+
     await main(options);
   });
 
