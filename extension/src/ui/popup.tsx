@@ -373,6 +373,32 @@ const Popup: React.FC = () => {
           >
             🧪 Test Page
           </button>
+          {debugMode && (
+            <>
+              <button
+                className="debug-link"
+                onClick={() => {
+                  chrome.tabs.create({ url: 'chrome://extensions', active: true });
+                }}
+              >
+                🔧 Extension Console
+              </button>
+              <button
+                className="debug-link"
+                onClick={async () => {
+                  const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                  if (currentTab?.id) {
+                    chrome.scripting.executeScript({
+                      target: { tabId: currentTab.id },
+                      func: () => { debugger; }
+                    });
+                  }
+                }}
+              >
+                🪲 Page Console
+              </button>
+            </>
+          )}
           {!isPro && (
             <a
               href={config.buyMeACoffeeUrl}
