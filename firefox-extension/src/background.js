@@ -254,6 +254,15 @@ async function setupDialogOverrides(tabId, accept = true, promptText = '') {
 // Auto-connect to MCP server on startup
 async function autoConnect() {
   try {
+    // Check if extension is enabled before attempting to connect
+    const result = await browser.storage.local.get(['extensionEnabled']);
+    const isEnabled = result.extensionEnabled !== false;
+
+    if (!isEnabled) {
+      log('[Background] Extension is disabled, skipping auto-connect');
+      return;
+    }
+
     // Show connecting badge (yellow)
     await updateConnectingBadge();
 
@@ -1486,6 +1495,24 @@ let isReconnecting = false;
 // Listen for storage changes (login/logout)
 browser.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local') {
+    // Handle extension enabled/disabled
+    if (changes.extensionEnabled) {
+      const isEnabled = changes.extensionEnabled.newValue !== false;
+
+      // If disabled, disconnect
+      if (!isEnabled && socket) {
+        log('[Background] Extension disabled, disconnecting...');
+        socket.close();
+        socket = null;
+        isConnected = false;
+        attachedTabId = null;
+        stealthMode = null;
+        projectName = null;
+        setGlobalIcon('normal', 'Blueprint MCP');
+        broadcastStatusChange();
+      }
+    }
+
     // Only reconnect when user explicitly logs in/out (accessToken/refreshToken change)
     // Don't reconnect on isPro changes (those are set by autoConnect itself)
     if ((changes.accessToken || changes.refreshToken) && !isReconnecting) {
