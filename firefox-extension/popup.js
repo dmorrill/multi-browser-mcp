@@ -376,6 +376,14 @@ function renderMain() {
           <button class="test-page-link" id="testPageButton">
             🧪 Test Page
           </button>
+          ${state.debugMode ? `
+            <button class="debug-link" id="extensionConsoleButton">
+              🔧 Extension Console
+            </button>
+            <button class="debug-link" id="pageConsoleButton">
+              🪲 Page Console
+            </button>
+          ` : ''}
           ${!state.isPro ? `
             <a
               href="${config.buyMeACoffeeUrl}"
@@ -432,6 +440,8 @@ function attachEventListeners() {
     const upgradeButton = document.getElementById('upgradeButton');
     const signInButton = document.getElementById('signInButton');
     const logoutButton = document.getElementById('logoutButton');
+    const extensionConsoleButton = document.getElementById('extensionConsoleButton');
+    const pageConsoleButton = document.getElementById('pageConsoleButton');
 
     if (toggleButton) toggleButton.addEventListener('click', toggleEnabled);
     if (settingsButton) {
@@ -444,6 +454,26 @@ function attachEventListeners() {
       testPageButton.addEventListener('click', () => {
         const testPageUrl = 'https://blueprint-mcp.railsblueprint.com/test-page';
         browser.tabs.create({ url: testPageUrl, active: true });
+      });
+    }
+    if (extensionConsoleButton) {
+      extensionConsoleButton.addEventListener('click', () => {
+        // Open Firefox debugging page where user can click "Inspect" on this extension
+        browser.tabs.create({ url: 'about:debugging#/runtime/this-firefox', active: true });
+      });
+    }
+    if (pageConsoleButton) {
+      pageConsoleButton.addEventListener('click', async () => {
+        // Get current tab and inject debugger statement to open DevTools
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0]) {
+          browser.tabs.executeScript(tabs[0].id, {
+            code: 'console.log("[Blueprint MCP] Opening DevTools..."); debugger;'
+          }).catch(() => {
+            // If injection fails, show keyboard shortcut
+            alert('Press F12 (or Cmd+Option+I on Mac) to open DevTools');
+          });
+        }
       });
     }
     if (upgradeButton) {
