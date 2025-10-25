@@ -148,18 +148,16 @@ function detectTechStack() {
         (document.querySelector('[class*="col-"]') || document.querySelector('[data-bs-]'))) {
       stack.css.push('Bootstrap');
     }
-    // Tailwind - check for common utility classes
+    // Tailwind - check for distinctive patterns (avoid Bootstrap false positives)
+    // Tailwind has color utilities with numbers like text-blue-500, bg-red-600
+    // and standalone flex/grid (not Bootstrap's d-flex/d-grid)
+    const hasTailwindColors = document.querySelector('[class*="text-"][class*="-500"], [class*="bg-"][class*="-600"], [class*="text-"][class*="-400"], [class*="bg-"][class*="-700"]');
+    const hasTailwindUtilities = document.querySelector('[class*="w-full"], [class*="h-screen"], [class*="space-x-"], [class*="divide-"]');
     const bodyClasses = document.body.className;
-    if (bodyClasses && (
-        bodyClasses.match(/\b(flex|grid|p-\d+|m-\d+|text-\w+-\d+|bg-\w+-\d+)\b/) ||
-        document.querySelector('[class*="flex "]') ||
-        document.querySelector('[class*="grid "]')
-      )) {
-      // More specific check for Tailwind patterns
-      const allElements = document.querySelectorAll('[class*="p-"], [class*="m-"], [class*="text-"], [class*="bg-"]');
-      if (allElements.length > 5) {
-        stack.css.push('Tailwind');
-      }
+    const hasStandaloneFlex = bodyClasses && bodyClasses.split(/\s+/).some(cls => cls === 'flex' || cls === 'grid' || cls === 'hidden' || cls === 'block');
+
+    if (hasTailwindColors || hasTailwindUtilities || hasStandaloneFlex) {
+      stack.css.push('Tailwind');
     }
     if (document.querySelector('[class*="Mui"]') || window.MaterialUI) {
       stack.css.push('Material-UI');
