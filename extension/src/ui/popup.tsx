@@ -331,11 +331,14 @@ const Popup: React.FC = () => {
               {userEmail && <p className="pro-email">{userEmail}</p>}
               {!connecting && connectionStatus && (
                 <div className="connection-status">
-                  <p className="connection-limit">
-                    Connections: {connectionStatus.connections_used}/{connectionStatus.max_connections}
+                  <p className="connection-limit" style={{fontWeight: 'bold', marginBottom: '8px'}}>
+                    Active Links: {connectionStatus.connections_used}/{connectionStatus.max_connections}
                   </p>
-                  <p className="connection-browser">
-                    This browser: {connectionStatus.connections_to_this_browser}
+                  <p className="connection-detail" style={{fontSize: '0.85em', color: '#666', margin: '4px 0'}}>
+                    Links to this browser: {connectionStatus.connections_to_this_browser}
+                  </p>
+                  <p className="connection-help" style={{fontSize: '0.75em', color: '#999', marginTop: '8px', fontStyle: 'italic'}}>
+                    Active links = browser↔MCP connections
                   </p>
                 </div>
               )}

@@ -343,11 +343,14 @@ function renderMain() {
               ${state.userEmail ? `<p class="pro-email">${state.userEmail}</p>` : ''}
               ${!state.connecting && state.connectionStatus ? `
                 <div class="connection-status">
-                  <p class="connection-limit">
-                    Connections: ${state.connectionStatus.connections_used}/${state.connectionStatus.max_connections}
+                  <p class="connection-limit" style="font-weight: bold; margin-bottom: 8px;">
+                    Active Links: ${state.connectionStatus.connections_used}/${state.connectionStatus.max_connections}
                   </p>
-                  <p class="connection-browser">
-                    This browser: ${state.connectionStatus.connections_to_this_browser}
+                  <p class="connection-detail" style="font-size: 0.85em; color: #666; margin: 4px 0;">
+                    Links to this browser: ${state.connectionStatus.connections_to_this_browser}
+                  </p>
+                  <p class="connection-help" style="font-size: 0.75em; color: #999; margin-top: 8px; font-style: italic;">
+                    Active links = browser↔MCP connections
                   </p>
                 </div>
               ` : ''}
