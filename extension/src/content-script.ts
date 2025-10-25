@@ -113,6 +113,14 @@ function detectTechStack(): TechStack {
       stack.frameworks.push('Google Wiz');
       stack.spa = true;
     }
+    // Polymer - Google's web components library (used on YouTube, etc.)
+    if ((window as any).Polymer ||
+        document.querySelector('iron-iconset-svg') ||
+        document.querySelector('ytd-app') ||
+        document.querySelector('[is^="iron-"], [is^="paper-"], [is^="ytd-"]')) {
+      stack.frameworks.push('Polymer');
+      stack.spa = true;
+    }
 
     // JS Libraries
     if ((window as any).jQuery || (window as any).$) {
