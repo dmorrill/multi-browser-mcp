@@ -97,7 +97,16 @@ function detectTechStack() {
       stack.frameworks.push('Angular');
       stack.spa = true;
     }
-    if (window.Turbo) {
+    // Turbo/Hotwire - check multiple sources
+    if (window.Turbo ||
+        document.querySelector('turbo-frame') ||
+        document.querySelector('meta[name="turbo-cache-control"]') ||
+        (function() {
+          try {
+            const importmap = document.querySelector('script[type="importmap"]');
+            return importmap && (importmap.textContent.includes('@hotwired/turbo') || importmap.textContent.includes('turbo'));
+          } catch(e) { return false; }
+        })()) {
       stack.frameworks.push('Turbo');
       stack.spa = true;
     }
@@ -163,7 +172,16 @@ function detectTechStack() {
     }
 
     // Dev Tools / Auto-reload
-    if (window.Spark) {
+    // Hotwire Spark - check multiple sources
+    if (window.Spark ||
+        document.querySelector('script[src*="hotwire_spark"]') ||
+        document.querySelector('script[src*="hotwire-spark"]') ||
+        (function() {
+          try {
+            const importmap = document.querySelector('script[type="importmap"]');
+            return importmap && (importmap.textContent.includes('@hotwired/spark') || importmap.textContent.includes('hotwire_spark'));
+          } catch(e) { return false; }
+        })()) {
       stack.devTools.push('Hotwire Spark');
       stack.autoReload = true;
     }
