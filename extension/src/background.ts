@@ -112,6 +112,18 @@ class TabShareExtension {
       return;
     }
 
+    // Check if extension is enabled before attempting to connect
+    const isEnabled = await new Promise<boolean>((resolve) => {
+      chrome.storage.local.get(['extensionEnabled'], (result) => {
+        resolve(result.extensionEnabled !== false);
+      });
+    });
+
+    if (!isEnabled) {
+      logger.debug('Extension is disabled, skipping auto-connect');
+      return;
+    }
+
     this._autoConnecting = true;
     this._autoConnectAttempts++;
 
@@ -657,9 +669,19 @@ class TabShareExtension {
       const isConnected = this._activeConnection !== undefined;
       void this._updateGlobalIcon(isEnabled && isConnected);
 
-      // If disabled, disconnect
-      if (!isEnabled && this._activeConnection) {
-        void this._disconnect();
+      // If disabled, disconnect and cancel reconnect alarms
+      if (!isEnabled) {
+        if (this._activeConnection) {
+          void this._disconnect();
+        }
+        // Cancel any pending reconnect alarms
+        if (chrome.alarms) {
+          chrome.alarms.clear('reconnect', (wasCleared) => {
+            if (wasCleared) {
+              logger.debug('Reconnect alarm cancelled due to extension being disabled');
+            }
+          });
+        }
       }
     }
 
