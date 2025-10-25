@@ -184,6 +184,12 @@ class MCPConnection {
           this.onBrowserDisconnected(message.params);
         }
 
+        // Handle tab_info_update notification from extension (via proxy)
+        if (message.method === 'notifications/tab_info_update' && message.params?.currentTab && this.onTabInfoUpdate) {
+          debugLog('Tab info update notification:', message.params.currentTab);
+          this.onTabInfoUpdate(message.params.currentTab);
+        }
+
         return;
       }
 

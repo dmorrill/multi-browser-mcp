@@ -142,9 +142,16 @@ class ExtensionServer {
         return;
       }
 
-      // Handle notifications (has method but no id) - just log
+      // Handle notifications (has method but no id)
       if (message.method && message.id === undefined) {
         debugLog('Received notification:', message.method);
+
+        // Handle tab_info_update notification from Firefox extension
+        if (message.method === 'notifications/tab_info_update' && message.params?.currentTab && this.onTabInfoUpdate) {
+          debugLog('Tab info update notification:', message.params.currentTab);
+          this.onTabInfoUpdate(message.params.currentTab);
+        }
+
         return;
       }
     } catch (error) {
