@@ -823,8 +823,14 @@ async function handleCDPCommand(params) {
           if (detectedStack.spa) {
             techStackMessage += '\n- Single Page Application (SPA) detected';
           }
+          if (detectedStack.obfuscatedCSS) {
+            techStackMessage += '\n\n⚠️ **Obfuscated CSS Detected:** Class names are minified/randomized. Do not attempt to use specific class names for selectors - use semantic HTML elements, ARIA labels, or data attributes instead.';
+          }
         } else {
           techStackMessage = '\n\n**Tech Stack:** None detected (static HTML or unknown frameworks)';
+          if (detectedStack && detectedStack.obfuscatedCSS) {
+            techStackMessage += '\n\n⚠️ **Obfuscated CSS Detected:** Class names are minified/randomized. Do not attempt to use specific class names for selectors - use semantic HTML elements, ARIA labels, or data attributes instead.';
+          }
         }
       } else {
         techStackMessage = '\n\n**Tech Stack:** Detection pending or page not yet loaded';

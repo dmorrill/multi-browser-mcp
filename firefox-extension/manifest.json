@@ -11,7 +11,9 @@
     "webRequest",
     "storage",
     "management",
-    "<all_urls>"
+    "<all_urls>",
+    "*://*.railsblueprint.com/*",
+    "*://*.blueprintmcp.com/*"
   ],
 
   "background": {

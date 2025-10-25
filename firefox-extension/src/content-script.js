@@ -80,12 +80,18 @@ function detectTechStack() {
     css: [],
     devTools: [],
     spa: false,
-    autoReload: false
+    autoReload: false,
+    obfuscatedCSS: false
   };
 
   try {
     // JS Frameworks
-    if (window.React || window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+    // React - check global object, dev tools hook, or mount point patterns
+    if (window.React ||
+        window.__REACT_DEVTOOLS_GLOBAL_HOOK__ ||
+        document.getElementById('root') ||
+        document.getElementById('react-root') ||
+        document.querySelector('[id^="mount_"]')) {
       stack.frameworks.push('React');
       stack.spa = true;
     }
@@ -211,6 +217,13 @@ function detectTechStack() {
     if (window.LiveReload) {
       stack.devTools.push('LiveReload');
       stack.autoReload = true;
+    }
+
+    // Check for obfuscated CSS (helps AI know not to guess class names)
+    // Common patterns: _x1a2b, __xyz123, single underscore + random chars
+    // Reuse bodyClasses from Tailwind detection above
+    if (bodyClasses && bodyClasses.match(/\b_[a-z0-9]{4,}\b/)) {
+      stack.obfuscatedCSS = true;
     }
 
   } catch (error) {

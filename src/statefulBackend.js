@@ -139,6 +139,10 @@ class StatefulBackend {
           if (techParts.length > 0) {
             parts.push(`🔧 ${techParts.join(' + ')}`);
           }
+          // Show obfuscated CSS warning
+          if (tech.obfuscatedCSS) {
+            parts.push(`⚠️ Obfuscated CSS`);
+          }
         }
       } else {
         parts.push(`⚠️ No tab attached`);
