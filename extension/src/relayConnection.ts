@@ -1043,6 +1043,11 @@ export class RelayConnection {
       debugLog('Creating new tab - url:', url, 'activate:', activate, 'stealth:', stealth);
       return await this._createTab(url, activate, stealth, connectionId);
     }
+    if (message.method === 'closeTab') {
+      const tabIndex = message.params?.index;
+      debugLog('Closing tab:', tabIndex !== undefined ? `index ${tabIndex}` : 'current');
+      return await this._closeTab(tabIndex);
+    }
     if (message.method === 'activateTab') {
       const tabIndex = message.params?.tabIndex;
       if (tabIndex === undefined) {
@@ -1619,6 +1624,55 @@ export class RelayConnection {
         // Return the requested URL, not newTab.url which might be about:blank initially
         url: url
       },
+    };
+  }
+
+  private async _closeTab(tabIndex?: number): Promise<any> {
+    let tabToClose: chrome.tabs.Tab | undefined;
+
+    if (tabIndex !== undefined) {
+      // Close specific tab by index
+      const allTabs = await chrome.tabs.query({});
+      const filteredTabs = allTabs.filter(tab =>
+        tab.url && !['chrome:', 'edge:', 'devtools:'].some(scheme => tab.url!.startsWith(scheme))
+      );
+
+      if (tabIndex < 0 || tabIndex >= filteredTabs.length) {
+        throw new Error(`Tab index ${tabIndex} out of range (0-${filteredTabs.length - 1})`);
+      }
+
+      tabToClose = filteredTabs[tabIndex];
+    } else {
+      // Close currently attached tab
+      if (!this._debuggee?.tabId) {
+        throw new Error('No tab is currently attached');
+      }
+
+      tabToClose = await chrome.tabs.get(this._debuggee.tabId);
+    }
+
+    if (!tabToClose?.id) {
+      throw new Error('Invalid tab ID');
+    }
+
+    // Detach debugger if attached to this tab
+    if (this._debuggee?.tabId === tabToClose.id) {
+      try {
+        await chrome.debugger.detach(this._debuggee);
+        debugLog('Detached debugger from tab before closing');
+      } catch (error: any) {
+        debugLog('Failed to detach debugger (may already be detached):', error.message);
+      }
+      this._debuggee = { tabId: -1 };
+    }
+
+    // Close the tab
+    await chrome.tabs.remove(tabToClose.id);
+    debugLog('Tab closed:', tabToClose.id);
+
+    return {
+      success: true,
+      closedTabId: tabToClose.id
     };
   }
 
