@@ -1,0 +1,274 @@
+/**
+ * Tab management handlers for browser extensions
+ * Handles tab listing, creation, selection, and closing
+ */
+
+/**
+ * Tab handlers class
+ * Manages tab operations and state
+ */
+export class TabHandlers {
+  constructor(browserAPI, logger, iconManager) {
+    this.browser = browserAPI;
+    this.logger = logger;
+    this.iconManager = iconManager;
+
+    // Tab state
+    this.attachedTabId = null;
+    this.attachedTabInfo = null;
+    this.stealthMode = false;
+
+    // Tech stack info (shared with other modules)
+    this.techStackInfo = {};
+
+    // Injection handlers (will be set by consumer)
+    this.consoleInjector = null;
+    this.dialogInjector = null;
+  }
+
+  /**
+   * Set console capture injector
+   */
+  setConsoleInjector(injector) {
+    this.consoleInjector = injector;
+  }
+
+  /**
+   * Set dialog overrides injector
+   */
+  setDialogInjector(injector) {
+    this.dialogInjector = injector;
+  }
+
+  /**
+   * Set tech stack info
+   */
+  setTechStackInfo(tabId, techStack) {
+    this.techStackInfo[tabId] = techStack;
+
+    // Update attached tab info if this is the attached tab
+    if (this.attachedTabId === tabId && this.attachedTabInfo) {
+      this.attachedTabInfo.techStack = techStack;
+    }
+  }
+
+  /**
+   * Get attached tab info
+   */
+  getAttachedTabInfo() {
+    return this.attachedTabInfo;
+  }
+
+  /**
+   * Get attached tab ID
+   */
+  getAttachedTabId() {
+    return this.attachedTabId;
+  }
+
+  /**
+   * Get stealth mode state
+   */
+  getStealthMode() {
+    return this.stealthMode;
+  }
+
+  /**
+   * Handle getTabs command
+   * Returns list of all tabs from all windows
+   */
+  async getTabs() {
+    // Get all tabs from all windows
+    const windows = await this.browser.windows.getAll({ populate: true });
+    const tabs = [];
+    let tabIndex = 0;
+
+    windows.forEach(window => {
+      window.tabs.forEach(tab => {
+        // Check if tab is automatable (not about:, moz-extension:, chrome:, etc.)
+        const isAutomatable = tab.url &&
+          !['about:', 'moz-extension:', 'chrome:', 'chrome-extension:'].some(scheme =>
+            tab.url.startsWith(scheme)
+          );
+
+        tabs.push({
+          id: tab.id,
+          windowId: window.id,
+          title: tab.title,
+          url: tab.url,
+          active: tab.active,
+          index: tabIndex,
+          automatable: isAutomatable
+        });
+
+        tabIndex++;
+      });
+    });
+
+    return { tabs };
+  }
+
+  /**
+   * Handle createTab command
+   * Creates a new tab and auto-attaches to it
+   */
+  async createTab(params) {
+    const url = params.url || 'about:blank';
+    const activate = params.activate !== false;
+    const stealth = params.stealth ?? false;
+
+    // Create new tab
+    const tab = await this.browser.tabs.create({
+      url: url,
+      active: activate
+    });
+
+    // Set stealth mode
+    this.stealthMode = stealth;
+
+    // Get all tabs to find the index of the newly created tab
+    const allTabs = await this.browser.tabs.query({});
+    const tabIndex = allTabs.findIndex(t => t.id === tab.id);
+
+    // Auto-attach to the new tab
+    this.attachedTabId = tab.id;
+    this.attachedTabInfo = {
+      id: tab.id,
+      title: tab.title,
+      url: tab.url,
+      index: tabIndex >= 0 ? tabIndex : undefined,
+      techStack: this.techStackInfo[tab.id] || null
+    };
+
+    // Update icon manager
+    if (this.iconManager) {
+      this.iconManager.setAttachedTab(tab.id);
+      this.iconManager.setStealthMode(stealth);
+      await this.iconManager.updateBadgeForTab();
+    }
+
+    // Inject console capture and dialog overrides
+    if (this.consoleInjector) {
+      await this.consoleInjector(tab.id);
+    }
+    if (this.dialogInjector) {
+      await this.dialogInjector(tab.id);
+    }
+
+    return { tab: { id: tab.id, title: tab.title, url: tab.url } };
+  }
+
+  /**
+   * Handle selectTab command
+   * Attaches to an existing tab by index
+   */
+  async selectTab(params) {
+    const tabIndex = params.tabIndex;
+    const activate = params.activate !== false;
+    const stealth = params.stealth ?? false;
+
+    // Get all tabs
+    const allTabs = await this.browser.tabs.query({});
+
+    if (tabIndex < 0 || tabIndex >= allTabs.length) {
+      throw new Error(`Tab index ${tabIndex} out of range (0-${allTabs.length - 1})`);
+    }
+
+    const selectedTab = allTabs[tabIndex];
+
+    // Check if tab is automatable
+    const isAutomatable = selectedTab.url &&
+      !['about:', 'moz-extension:', 'chrome:', 'chrome-extension:'].some(scheme =>
+        selectedTab.url.startsWith(scheme)
+      );
+
+    if (!isAutomatable) {
+      throw new Error(
+        `Cannot automate tab ${tabIndex}: "${selectedTab.title}" (${selectedTab.url || 'no url'}) - ` +
+        `System pages (about:, chrome:, etc.) cannot be automated`
+      );
+    }
+
+    // Optionally switch to the tab
+    if (activate) {
+      await this.browser.tabs.update(selectedTab.id, { active: true });
+      await this.browser.windows.update(selectedTab.windowId, { focused: true });
+    }
+
+    // Clear badge from old tab if there was one
+    const oldTabId = this.attachedTabId;
+    if (oldTabId && oldTabId !== selectedTab.id && this.iconManager) {
+      await this.iconManager.clearBadge(oldTabId);
+    }
+
+    // Set stealth mode
+    this.stealthMode = stealth;
+
+    // Attach to this tab
+    this.attachedTabId = selectedTab.id;
+    this.attachedTabInfo = {
+      id: selectedTab.id,
+      title: selectedTab.title,
+      url: selectedTab.url,
+      index: tabIndex,
+      techStack: this.techStackInfo[selectedTab.id] || null
+    };
+
+    // Update icon manager
+    if (this.iconManager) {
+      this.iconManager.setAttachedTab(selectedTab.id);
+      this.iconManager.setStealthMode(stealth);
+      await this.iconManager.updateBadgeForTab();
+    }
+
+    // Inject console capture and dialog overrides
+    if (this.consoleInjector) {
+      await this.consoleInjector(selectedTab.id);
+    }
+    if (this.dialogInjector) {
+      await this.dialogInjector(selectedTab.id);
+    }
+
+    return { tab: { id: selectedTab.id, title: selectedTab.title, url: selectedTab.url } };
+  }
+
+  /**
+   * Handle closeTab command
+   * Closes the currently attached tab
+   */
+  async closeTab() {
+    if (!this.attachedTabId) {
+      throw new Error('No tab attached');
+    }
+
+    await this.browser.tabs.remove(this.attachedTabId);
+    this.attachedTabId = null;
+    this.attachedTabInfo = null;
+
+    // Update icon manager
+    if (this.iconManager) {
+      this.iconManager.setAttachedTab(null);
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Handle tab closed event (called when tab is closed externally)
+   */
+  async handleTabClosed(tabId) {
+    if (tabId === this.attachedTabId) {
+      this.logger.log('[TabHandlers] Attached tab closed');
+      this.attachedTabId = null;
+      this.attachedTabInfo = null;
+
+      // Update icon manager
+      if (this.iconManager) {
+        this.iconManager.setAttachedTab(null);
+      }
+    }
+
+    // Clean up tech stack info
+    delete this.techStackInfo[tabId];
+  }
+}
