@@ -1301,7 +1301,7 @@ class UnifiedBackend {
                     }));
 
                     return {
-                      selector: '${action.selector}',
+                      selector: ${JSON.stringify(action.selector)},
                       currentValue: el.value,
                       options: options
                     };
