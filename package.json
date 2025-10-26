@@ -12,15 +12,12 @@
     "name": "Rails Blueprint"
   },
   "license": "Apache-2.0",
-  "workspaces": [
-    "server",
-    "extensions/chrome"
-  ],
   "scripts": {
-    "install:all": "npm install && npm install --workspace=server && npm install --workspace=extensions/chrome",
-    "build:chrome": "npm run build --workspace=extensions/chrome",
-    "test:server": "npm test --workspace=server",
-    "dev:server": "npm run dev --workspace=server"
-  },
-  "devDependencies": {}
+    "install:server": "cd server && npm install",
+    "install:chrome": "cd extensions/chrome && npm install",
+    "install:all": "npm run install:server && npm run install:chrome",
+    "build:chrome": "cd extensions/chrome && npm run build",
+    "test:server": "cd server && npm test",
+    "dev:server": "cd server && node cli.js --debug"
+  }
 }
