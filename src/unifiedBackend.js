@@ -136,7 +136,7 @@ class UnifiedBackend {
             },
             index: {
               type: 'number',
-              description: 'Tab index (for attach action)'
+              description: 'Tab index (for attach/close actions)'
             },
             activate: {
               type: 'boolean',
@@ -746,6 +746,27 @@ class UnifiedBackend {
         content: [{
           type: 'text',
           text: `### ✅ Tab Attached\n\n**Index:** ${args.index}\n**Title:** ${result.tab?.title}\n**URL:** ${result.tab?.url || 'N/A'}\n\n**Next Steps:**\n- \`browser_take_screenshot\` - Capture visual appearance of the page\n- \`browser_snapshot\` - Get accessibility tree structure for interactions\n- \`browser_extract_content\` - Extract page content as clean markdown`
+        }],
+        isError: false
+      };
+    }
+
+    if (action === 'close') {
+      // Close the currently attached tab
+      const result = await this._transport.sendCommand('closeTab', {
+        index: args.index
+      });
+
+      // Clear attached tab info
+      if (this._statefulBackend) {
+        this._statefulBackend._attachedTab = null;
+        this._statefulBackend._stealthMode = null;
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `### ✅ Tab Closed\n\nTab ${args.index !== undefined ? `at index ${args.index}` : '(current)'} has been closed.`
         }],
         isError: false
       };
