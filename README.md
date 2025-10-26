@@ -2,7 +2,7 @@
 
 > Control your real Chrome browser with AI through the Model Context Protocol
 
-[![npm version](https://badge.fury.io/js/@railsblueprint%2Fchrome-mcp.svg)](https://www.npmjs.com/package/@railsblueprint/chrome-mcp)
+[![npm version](https://badge.fury.io/js/@railsblueprint%2Fblueprint-mcp.svg)](https://www.npmjs.com/package/@railsblueprint/blueprint-mcp)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## What is this?
@@ -27,7 +27,7 @@ An MCP (Model Context Protocol) server that lets AI assistants control your actu
 ### 1. Install the MCP Server
 
 ```bash
-npm install -g @railsblueprint/chrome-mcp
+npm install -g @railsblueprint/blueprint-mcp
 ```
 
 ### 2. Install the Chrome Extension
@@ -36,7 +36,7 @@ npm install -g @railsblueprint/chrome-mcp
 - Visit: [Chrome Web Store link - Coming Soon]
 
 **Option B: Manual Installation (Development)**
-1. Download the latest release from [Releases](https://github.com/railsblueprint/chrome-mcp/releases)
+1. Download the latest release from [Releases](https://github.com/railsblueprint/blueprint-mcp/releases)
 2. Unzip the extension
 3. Open `chrome://extensions/`
 4. Enable "Developer mode"
@@ -49,7 +49,7 @@ npm install -g @railsblueprint/chrome-mcp
 {
   "mcpServers": {
     "chrome": {
-      "command": "chrome-mcp"
+      "command": "blueprint-mcp"
     }
   }
 }
@@ -60,7 +60,7 @@ npm install -g @railsblueprint/chrome-mcp
 {
   "mcp.servers": {
     "chrome": {
-      "command": "chrome-mcp"
+      "command": "blueprint-mcp"
     }
   }
 }
@@ -68,7 +68,7 @@ npm install -g @railsblueprint/chrome-mcp
 
 **Cline** (Claude Code CLI):
 ```bash
-claude mcp add chrome chrome-mcp
+claude mcp add chrome blueprint-mcp
 ```
 
 ## Quick Start
@@ -108,7 +108,7 @@ AI: *captures screenshot and shows you*
             │ stdio/JSON-RPC
             ↓
 ┌─────────────────────────┐
-│   chrome-mcp            │
+│   blueprint-mcp            │
 │   (this package)        │
 └───────────┬─────────────┘
             │
@@ -142,7 +142,7 @@ AI: *captures screenshot and shows you*
 - ✅ **Auto-reconnect** - maintains connection through network changes
 - ✅ **Priority support**
 
-[Upgrade to PRO](https://mcp-for-chrome.railsblueprint.com)
+[Upgrade to PRO](https://blueprint-mcp.railsblueprint.com)
 
 ## Available Tools
 
@@ -212,8 +212,8 @@ The MCP server provides these tools to AI assistants:
 
 ```bash
 # Clone the repository
-git clone https://github.com/railsblueprint/chrome-mcp.git
-cd chrome-mcp
+git clone https://github.com/railsblueprint/blueprint-mcp.git
+cd blueprint-mcp
 
 # Install server dependencies
 npm install
@@ -248,7 +248,7 @@ npm run dev
 ### Project Structure
 
 ```
-chrome-mcp/
+blueprint-mcp/
 ├── cli.js                      # MCP server entry point
 ├── src/
 │   ├── statefulBackend.js      # Connection state management
@@ -285,7 +285,7 @@ Create a `.env` file in the project root:
 
 ```bash
 # Authentication server (PRO features)
-AUTH_BASE_URL=https://mcp-for-chrome.railsblueprint.com
+AUTH_BASE_URL=https://blueprint-mcp.railsblueprint.com
 
 # Local WebSocket port (Free tier)
 MCP_PORT=5555
@@ -297,7 +297,7 @@ DEBUG=false
 ### Command Line Options
 
 ```bash
-chrome-mcp --debug          # Enable verbose logging
+blueprint-mcp --debug          # Enable verbose logging
 ```
 
 ## Troubleshooting
@@ -320,8 +320,8 @@ lsof -ti:5555 | xargs kill -9
 3. Verify the tab still exists (wasn't closed)
 
 ### Getting help
-- [GitHub Issues](https://github.com/railsblueprint/chrome-mcp/issues)
-- [Documentation](https://mcp-for-chrome.railsblueprint.com/docs)
+- [GitHub Issues](https://github.com/railsblueprint/blueprint-mcp/issues)
+- [Documentation](https://blueprint-mcp.railsblueprint.com/docs)
 
 ## Contributing
 
@@ -360,6 +360,6 @@ Copyright (c) 2024 Rails Blueprint
 
 **Built with ❤️ by [Rails Blueprint](https://railsblueprint.com)**
 
-[Website](https://mcp-for-chrome.railsblueprint.com) •
-[GitHub](https://github.com/railsblueprint/chrome-mcp) •
-[NPM](https://www.npmjs.com/package/@railsblueprint/chrome-mcp)
+[Website](https://blueprint-mcp.railsblueprint.com) •
+[GitHub](https://github.com/railsblueprint/blueprint-mcp) •
+[NPM](https://www.npmjs.com/package/@railsblueprint/blueprint-mcp)

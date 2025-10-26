@@ -80,7 +80,7 @@ cd firefox-extension
 ### Project Structure
 
 ```
-chrome-mcp/
+blueprint-mcp/
 ├── cli.js                      # MCP server entry point
 ├── src/
 │   ├── statefulBackend.js      # Connection state management (passive/active/connected)
@@ -245,7 +245,7 @@ class ProxyTransport {
 ## Connection Flow
 
 ### Free Mode (Direct Connection)
-1. MCP client starts `chrome-mcp` server → **passive state**
+1. MCP client starts `blueprint-mcp` server → **passive state**
 2. User calls `enable` tool → Server starts WebSocket on port 5555 → **active state**
 3. Extension auto-connects to localhost:5555 → **connected state**
 4. Tools like `browser_tabs`, `browser_navigate` become available

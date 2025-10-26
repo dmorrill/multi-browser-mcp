@@ -15,7 +15,7 @@ This protocol enables MCP (Model Context Protocol) servers to communicate with b
 MCP Client <--JSON-RPC--> Proxy Server <--JSON-RPC--> Browser Extension
 ```
 
-- **MCP Client**: Automation tool (e.g., Claude Desktop, npx chrome-mcp)
+- **MCP Client**: Automation tool (e.g., Claude Desktop, npx blueprint-mcp)
 - **Proxy Server**: Central routing and authentication server
 - **Browser Extension**: Chrome/Edge extension running in user's browser
 

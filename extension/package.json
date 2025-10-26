@@ -5,9 +5,9 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/railsblueprint/chrome-mcp.git"
+    "url": "git+https://github.com/railsblueprint/blueprint-mcp.git"
   },
-  "homepage": "https://mcp-for-chrome.railsblueprint.com",
+  "homepage": "https://blueprint-mcp.railsblueprint.com",
   "engines": {
     "node": ">=18"
   },

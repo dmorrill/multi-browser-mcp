@@ -72,7 +72,7 @@ After signing in:
 The extension implements the MCP Proxy Protocol for authentication:
 
 **Connection Flow:**
-1. Extension connects to relay server WebSocket (wss://mcp-for-chrome.railsblueprint.com)
+1. Extension connects to relay server WebSocket (wss://blueprint-mcp.railsblueprint.com)
 2. Relay sends `authenticate` request
 3. Extension responds with stored tokens:
    ```json
@@ -109,7 +109,7 @@ Settings are stored in `browser.storage.local`:
 
 Tokens are obtained automatically through the web-based login flow:
 1. User clicks "Sign in" in popup
-2. Browser opens: `https://mcp-for-chrome.railsblueprint.com/extension/login?extension_id=<id>`
+2. Browser opens: `https://blueprint-mcp.railsblueprint.com/extension/login?extension_id=<id>`
 3. User logs in via OAuth provider
 4. After successful login, tokens are stored in `browser.storage.local`
 5. Extension auto-connects to relay server
@@ -149,12 +149,12 @@ Tokens are obtained automatically through the web-based login flow:
 ## Relay Server URL
 
 ```
-wss://mcp-for-chrome.railsblueprint.com
+wss://blueprint-mcp.railsblueprint.com
 ```
 
 **Components:**
 - `wss://` - Secure WebSocket protocol
-- `mcp-for-chrome.railsblueprint.com` - Relay server domain
+- `blueprint-mcp.railsblueprint.com` - Relay server domain
 
 ## Comparison: Free vs PRO
 
@@ -252,5 +252,5 @@ if (state.showSettings) {
 ## Support
 
 For issues or questions:
-- GitHub: https://github.com/railsblueprint/chrome-mcp
+- GitHub: https://github.com/railsblueprint/blueprint-mcp
 - Documentation: https://docs.claude.com/en/docs/claude-code/mcp-server-chrome

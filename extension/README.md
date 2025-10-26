@@ -13,7 +13,7 @@ Blueprint MCP for Chrome allows you to connect to pages in your existing browser
 ### Download the Extension
 
 Download the latest Chrome extension from GitHub:
-- **Download link**: https://github.com/railsblueprint/chrome-mcp/releases
+- **Download link**: https://github.com/railsblueprint/blueprint-mcp/releases
 
 Or install from Chrome Web Store:
 - **Chrome Web Store**: https://chromewebstore.google.com/detail/browser-mcp/bjfgambnhccakkhmkepdoekmckoijdlc
@@ -31,10 +31,10 @@ Configure Blueprint MCP for Chrome by adding it to your MCP settings:
 ```json
 {
   "mcpServers": {
-    "chrome-mcp": {
+    "blueprint-mcp": {
       "command": "npx",
       "args": [
-        "@railsblueprint/chrome-mcp@latest"
+        "@railsblueprint/blueprint-mcp@latest"
       ]
     }
   }

@@ -47,7 +47,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/users/login"
+            "value": "https://blueprint-mcp.railsblueprint.com/users/login"
           }
         }
       ],
@@ -542,7 +542,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/"
+            "value": "https://blueprint-mcp.railsblueprint.com/"
           }
         }
       ],
@@ -620,7 +620,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/assets/logo-inverted-b9c3d381a9f746021a24816e47b27d6e3c8447d04f4936120e0333c989bbddec.png"
+            "value": "https://blueprint-mcp.railsblueprint.com/assets/logo-inverted-b9c3d381a9f746021a24816e47b27d6e3c8447d04f4936120e0333c989bbddec.png"
           }
         }
       ],
@@ -2262,7 +2262,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/users/register"
+            "value": "https://blueprint-mcp.railsblueprint.com/users/register"
           }
         }
       ],
@@ -2352,7 +2352,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/users/password/new"
+            "value": "https://blueprint-mcp.railsblueprint.com/users/password/new"
           }
         }
       ],
@@ -2442,7 +2442,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/users/confirmation/new"
+            "value": "https://blueprint-mcp.railsblueprint.com/users/confirmation/new"
           }
         }
       ],
@@ -2532,7 +2532,7 @@
           "name": "url",
           "value": {
             "type": "string",
-            "value": "https://mcp-for-chrome.railsblueprint.com/users/unlock/new"
+            "value": "https://blueprint-mcp.railsblueprint.com/users/unlock/new"
           }
         }
       ],

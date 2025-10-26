@@ -396,7 +396,7 @@ This document catalogs all features based on git history, code analysis, and doc
 ## 📦 Deployment & DevOps
 
 ### Packaging
-- ✅ NPM package - `@railsblueprint/chrome-mcp`
+- ✅ NPM package - `@railsblueprint/blueprint-mcp`
 - ✅ Semantic versioning - 1.5.5 current
 - ✅ Release script - Automated version bumps
   - Update package.json

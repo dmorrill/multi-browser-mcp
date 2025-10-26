@@ -1,12 +1,12 @@
 {
-  "name": "@railsblueprint/chrome-mcp",
+  "name": "@railsblueprint/blueprint-mcp",
   "version": "1.5.5",
-  "description": "MCP server for Chrome browser automation using real browser profiles",
+  "description": "MCP server for browser automation across Chrome, Firefox, and Safari using real browser profiles",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/railsblueprint/chrome-mcp.git"
+    "url": "git+https://github.com/railsblueprint/blueprint-mcp.git"
   },
-  "homepage": "https://mcp-for-chrome.railsblueprint.com",
+  "homepage": "https://blueprint-mcp.railsblueprint.com",
   "engines": {
     "node": ">=18"
   },
@@ -37,7 +37,7 @@
     "ws": "^8.18.3"
   },
   "bin": {
-    "chrome-mcp": "cli.js"
+    "blueprint-mcp": "cli.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

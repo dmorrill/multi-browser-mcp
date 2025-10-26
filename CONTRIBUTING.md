@@ -71,8 +71,8 @@ Fixes #123
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/chrome-mcp.git
-cd chrome-mcp
+git clone https://github.com/YOUR_USERNAME/blueprint-mcp.git
+cd blueprint-mcp
 
 # Install dependencies
 npm install
@@ -120,7 +120,7 @@ npm test -- tests/statefulBackend.test.js
 ## Project Structure
 
 ```
-chrome-mcp/
+blueprint-mcp/
 ├── cli.js                      # MCP server entry point
 ├── src/
 │   ├── statefulBackend.js      # Connection state management
@@ -249,8 +249,8 @@ Releases are handled by maintainers. The process:
 
 ## Questions?
 
-- **Issues**: [GitHub Issues](https://github.com/railsblueprint/chrome-mcp/issues)
-- **Documentation**: [docs.railsblueprint.com](https://mcp-for-chrome.railsblueprint.com/docs)
+- **Issues**: [GitHub Issues](https://github.com/railsblueprint/blueprint-mcp/issues)
+- **Documentation**: [docs.railsblueprint.com](https://blueprint-mcp.railsblueprint.com/docs)
 
 ## License
 

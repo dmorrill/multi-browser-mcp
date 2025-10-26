@@ -46,7 +46,7 @@ Temporarily disable iCloud Password Manager or similar extensions during automat
 #### Option 2: Use Separate Chrome Profile
 Create a dedicated Chrome profile for automation without password manager extensions:
 ```bash
-chrome-mcp --user-data-dir=/path/to/automation/profile
+blueprint-mcp --user-data-dir=/path/to/automation/profile
 ```
 
 #### Option 3: Avoid Affected Pages
