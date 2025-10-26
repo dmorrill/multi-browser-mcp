@@ -17,34 +17,36 @@ fi
 VERSION_TYPE=${1:-patch}
 echo "📦 Bumping version ($VERSION_TYPE)..."
 
-# Update root package.json
+# Update server package.json
+cd server
 npm version $VERSION_TYPE --no-git-tag-version
+cd ..
 
 # Get new version
-NEW_VERSION=$(node -p "require('./package.json').version")
+NEW_VERSION=$(node -p "require('./server/package.json').version")
 echo "✅ New version: $NEW_VERSION"
 
 # Update extension package.json
 echo "📦 Updating extension package.json..."
-cd extension
+cd extensions/chrome
 npm version $VERSION_TYPE --no-git-tag-version
-cd ..
+cd ../..
 
 # Update extension manifest.json
 echo "📦 Updating extension manifest.json..."
 node -e "
 const fs = require('fs');
-const manifest = JSON.parse(fs.readFileSync('extension/manifest.json', 'utf8'));
+const manifest = JSON.parse(fs.readFileSync('extensions/chrome/manifest.json', 'utf8'));
 manifest.version = '$NEW_VERSION';
-fs.writeFileSync('extension/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+fs.writeFileSync('extensions/chrome/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 console.log('✅ Updated manifest.json to version $NEW_VERSION');
 "
 
 # Rebuild extension (for local testing - dist is gitignored)
 echo "🔨 Building extension..."
-cd extension
+cd extensions/chrome
 npm run build
-cd ..
+cd ../..
 echo "✅ Extension built (note: dist/ is gitignored, users will build on install)"
 
 # Show what changed
@@ -55,7 +57,7 @@ git status --short
 # Commit
 echo ""
 read -p "📝 Enter commit message: " COMMIT_MSG
-git add package.json package-lock.json extension/package.json extension/package-lock.json extension/manifest.json extension/dist src/
+git add server/package.json server/package-lock.json extensions/chrome/package.json extensions/chrome/package-lock.json extensions/chrome/manifest.json server/src/
 git commit -m "$COMMIT_MSG
 
 Version bumped to $NEW_VERSION"
