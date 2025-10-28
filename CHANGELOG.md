@@ -1,3 +1,10 @@
+# v1.7.2 (2025-10-28)
+
+## Changes
+
+- Fix: Create log directory and use proper user data path
+
+
 # v1.7.1 (2025-10-28)
 
 ## Changes
