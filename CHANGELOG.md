@@ -1,3 +1,11 @@
+# v1.7.1 (2025-10-28)
+
+## Changes
+
+- Add version logging to debug mode
+- Fix: Sync root package.json version and update release script
+
+
 # v1.7.0 (2025-10-28)
 
 ## Changes
