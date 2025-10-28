@@ -5,11 +5,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const envPaths = require('env-paths');
 
 class FileLogger {
   constructor(logFilePath) {
     this.logFilePath = logFilePath;
     this.enabled = false;
+
+    // Ensure directory exists
+    const logDir = path.dirname(this.logFilePath);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
 
     // Clear log file on initialization
     if (fs.existsSync(this.logFilePath)) {
@@ -56,7 +63,14 @@ let instance = null;
 
 function getLogger(customLogPath = null) {
   if (!instance) {
-    const logPath = customLogPath || path.join(__dirname, '..', '..', 'logs', 'mcp-debug.log');
+    let logPath;
+    if (customLogPath) {
+      logPath = customLogPath;
+    } else {
+      // Use user data directory for logs (works with npx)
+      const paths = envPaths('blueprint-mcp', { suffix: '' });
+      logPath = path.join(paths.log, 'mcp-debug.log');
+    }
     instance = new FileLogger(logPath);
   }
   return instance;
