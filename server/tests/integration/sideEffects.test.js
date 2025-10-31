@@ -24,8 +24,8 @@ describe('Click Side Effects Detection', () => {
       techStack: null
     };
 
-    backend = new UnifiedBackend(statefulBackend);
-    backend._transport = mockTransport;
+    backend = new UnifiedBackend({ debug: false }, mockTransport);
+    backend._statefulBackend = statefulBackend; // Set stateful backend reference
   });
 
   describe('Navigation Side Effects', () => {
