@@ -1,3 +1,10 @@
+# v1.8.0 (2025-10-31)
+
+## Changes
+
+- Complete comprehensive testing suite and critical bug fixes (v1.7.3) (#5)
+
+
 # v1.7.2 (2025-10-28)
 
 ## Changes
