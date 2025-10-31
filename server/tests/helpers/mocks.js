@@ -30,6 +30,8 @@ function createMockExtensionServer(port = 5555) {
     start: jest.fn().mockResolvedValue(true),
     close: jest.fn().mockResolvedValue(true),
     sendCommand: jest.fn().mockResolvedValue({ success: true }),
+    setClientId: jest.fn(),
+    getBuildTimestamp: jest.fn().mockReturnValue('2025-10-31T12:00:00.000Z'),
     port,
     _isRunning: false
   };

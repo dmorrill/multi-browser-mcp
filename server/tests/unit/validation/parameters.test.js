@@ -16,6 +16,7 @@ jest.mock('../../../src/extensionServer', () => {
       close: jest.fn().mockResolvedValue(true),
       sendCommand: jest.fn().mockResolvedValue({ success: true }),
       setClientId: jest.fn(),
+      getBuildTimestamp: jest.fn().mockReturnValue('2025-10-31T12:00:00.000Z'),
       onReconnect: null,
       onTabInfoUpdate: null,
       port: 5555,

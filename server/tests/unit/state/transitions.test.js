@@ -17,6 +17,7 @@ jest.mock('../../../src/extensionServer', () => {
       close: jest.fn().mockResolvedValue(true),
       sendCommand: jest.fn().mockResolvedValue({ success: true }),
       setClientId: jest.fn(),
+      getBuildTimestamp: jest.fn().mockReturnValue('2025-10-31T12:00:00.000Z'),
       onReconnect: null,
       onTabInfoUpdate: null,
       port: 5555,
@@ -118,12 +119,18 @@ describe('State Transitions', () => {
       // ExtensionServer is mocked at module level
 
       // WHEN - Enable in Free mode
-      await backend.callTool('enable', {
+      const result = await backend.callTool('enable', {
         client_id: 'test',
         force_free: true
       });
 
+      // Debug: Check if enable returned an error
+      if (result.isError) {
+        console.log('Enable failed with error:', result.content[0].text);
+      }
+
       // THEN - Should be active
+      expect(result.isError).not.toBe(true);
       expectState(backend, 'active');
     });
 
