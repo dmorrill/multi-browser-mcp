@@ -1,3 +1,10 @@
+# v1.8.1 (2025-11-01)
+
+## Changes
+
+- Add proactive token refresh and live token expiration display (#6)
+
+
 # v1.8.0 (2025-10-31)
 
 ## Changes
