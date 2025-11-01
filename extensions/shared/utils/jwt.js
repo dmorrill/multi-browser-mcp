@@ -128,11 +128,23 @@ export async function refreshAccessToken(refreshToken, apiHost = API_HOST) {
   }
 
   const data = await response.json();
-  if (!data.access_token || !data.refresh_token) {
-    throw new Error('Invalid refresh response: missing tokens');
+  console.log('[JWT] API response data:', data);
+
+  // Handle JSON:API format (data.attributes) or plain format
+  const tokens = data.data?.attributes || data;
+
+  if (!tokens.access_token || !tokens.refresh_token) {
+    console.error('[JWT] Response missing tokens. Got:', Object.keys(data));
+    throw new Error(`Invalid refresh response: missing tokens. Got keys: ${Object.keys(data).join(', ')}`);
   }
 
-  return data;
+  // Return in expected format
+  return {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    token_type: tokens.token_type,
+    expires_in: tokens.expires_in
+  };
 }
 
 /**

@@ -45,6 +45,8 @@ let state = {
   projectName: null,
   debugMode: false,
   version: '1.0.0',
+  tokenInfo: null, // Token expiration info for debug display
+  tokenRefreshInterval: null, // Interval for live token checking
 };
 
 // Utility: Decode JWT (without validation - only for display)
@@ -71,6 +73,111 @@ async function getUserInfoFromStorage() {
     email: payload.email || payload.sub || null,
     sub: payload.sub,
   };
+}
+
+// Get token expiration info for display
+async function getTokenExpirationInfo() {
+  const result = await browserAPI.storage.local.get(['accessToken', 'refreshToken']);
+
+  if (!result.accessToken) {
+    return null;
+  }
+
+  // Decode access token
+  const accessPayload = decodeJWT(result.accessToken);
+  if (!accessPayload || !accessPayload.exp) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const accessExpiresAt = accessPayload.exp;
+  const accessTimeLeft = accessExpiresAt - now;
+  const accessMinutesLeft = Math.floor(accessTimeLeft / 60);
+  const accessSecondsLeft = accessTimeLeft % 60;
+
+  // Try to decode refresh token (might be JWT or opaque)
+  let refreshTokenInfo = null;
+  if (result.refreshToken) {
+    const refreshPayload = decodeJWT(result.refreshToken);
+    if (refreshPayload && refreshPayload.exp) {
+      const refreshExpiresAt = refreshPayload.exp;
+      const refreshTimeLeft = refreshExpiresAt - now;
+      const refreshMinutesLeft = Math.floor(refreshTimeLeft / 60);
+      const refreshSecondsLeft = refreshTimeLeft % 60;
+
+      refreshTokenInfo = {
+        expiresAt: new Date(refreshExpiresAt * 1000),
+        timeLeft: refreshTimeLeft,
+        minutesLeft: refreshMinutesLeft,
+        secondsLeft: refreshSecondsLeft,
+        isExpired: refreshTimeLeft < 0
+      };
+    }
+  }
+
+  return {
+    access: {
+      expiresAt: new Date(accessExpiresAt * 1000),
+      timeLeft: accessTimeLeft,
+      minutesLeft: accessMinutesLeft,
+      secondsLeft: accessSecondsLeft,
+      isExpired: accessTimeLeft < 0
+    },
+    refresh: refreshTokenInfo,
+    hasRefreshToken: !!result.refreshToken
+  };
+}
+
+// Start live token expiration checker
+// Re-reads token from storage and recalculates expiration every second
+function startTokenExpirationChecker() {
+  if (state.tokenRefreshInterval) {
+    clearInterval(state.tokenRefreshInterval);
+  }
+
+  // Fetch fresh token from storage and recalculate expiration every second
+  state.tokenRefreshInterval = setInterval(async () => {
+    if (state.showSettings && state.debugMode && state.isPro) {
+      // This reads from chrome.storage.local every second
+      state.tokenInfo = await getTokenExpirationInfo();
+
+      // Update just the token display without re-rendering entire page
+      const tokenDisplay = document.getElementById('tokenInfoDisplay');
+      if (tokenDisplay && state.tokenInfo) {
+        // Update access token time left
+        const accessTimeSpan = tokenDisplay.querySelector('[data-token="access-time"]');
+        if (accessTimeSpan && state.tokenInfo.access) {
+          const isExpired = state.tokenInfo.access.isExpired;
+          const timeLeft = state.tokenInfo.access.timeLeft;
+          const color = isExpired ? '#d32f2f' : (timeLeft < 120 ? '#f57c00' : '#388e3c');
+          accessTimeSpan.style.color = color;
+          accessTimeSpan.textContent = isExpired
+            ? '❌ EXPIRED'
+            : `${state.tokenInfo.access.minutesLeft}m ${state.tokenInfo.access.secondsLeft}s`;
+        }
+
+        // Update refresh token time left
+        const refreshTimeSpan = tokenDisplay.querySelector('[data-token="refresh-time"]');
+        if (refreshTimeSpan && state.tokenInfo.refresh) {
+          const isExpired = state.tokenInfo.refresh.isExpired;
+          const timeLeft = state.tokenInfo.refresh.timeLeft;
+          const color = isExpired ? '#d32f2f' : (timeLeft < 300 ? '#f57c00' : '#388e3c');
+          refreshTimeSpan.style.color = color;
+          refreshTimeSpan.textContent = isExpired
+            ? '❌ EXPIRED'
+            : `${state.tokenInfo.refresh.minutesLeft}m ${state.tokenInfo.refresh.secondsLeft}s`;
+        }
+      }
+    }
+  }, 1000); // Every second
+}
+
+// Stop live token expiration checker
+function stopTokenExpirationChecker() {
+  if (state.tokenRefreshInterval) {
+    clearInterval(state.tokenRefreshInterval);
+    state.tokenRefreshInterval = null;
+  }
 }
 
 // Get default browser name
@@ -143,6 +250,9 @@ async function toggleEnabled() {
 
 // Save settings
 async function saveSettings() {
+  // Stop token checker when leaving settings
+  stopTokenExpirationChecker();
+
   // Always save debug mode
   await browserAPI.storage.local.set({ debugMode: state.debugMode });
 
@@ -161,6 +271,9 @@ async function saveSettings() {
 
 // Cancel settings
 async function cancelSettings() {
+  // Stop token checker when leaving settings
+  stopTokenExpirationChecker();
+
   // Reload original values
   const storage = await browserAPI.storage.local.get(['browserName', 'mcpPort', 'debugMode']);
   state.browserName = storage.browserName || getDefaultBrowserName();
@@ -263,6 +376,40 @@ function renderSettings() {
               Enable detailed logging for troubleshooting
             </p>
           </div>
+
+          ${state.debugMode && state.isPro && state.tokenInfo ? `
+            <div id="tokenInfoDisplay" style="margin-top: 20px; padding: 12px; background: #f5f5f5; border-radius: 6px; font-size: 0.9em">
+              <div style="font-weight: 600; margin-bottom: 8px; color: #333">🔑 Token Status</div>
+
+              <!-- Access Token -->
+              <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0">
+                <div style="font-weight: 600; color: #555; margin-bottom: 4px">Access Token:</div>
+                <div><strong>Expires:</strong> ${state.tokenInfo.access.expiresAt.toLocaleString()}</div>
+                <div style="margin-top: 4px">
+                  <strong>Time left:</strong>
+                  <span data-token="access-time" style="color: ${state.tokenInfo.access.isExpired ? '#d32f2f' : (state.tokenInfo.access.timeLeft < 120 ? '#f57c00' : '#388e3c')}">
+                    ${state.tokenInfo.access.isExpired ? '❌ EXPIRED' : `${state.tokenInfo.access.minutesLeft}m ${state.tokenInfo.access.secondsLeft}s`}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Refresh Token -->
+              ${state.tokenInfo.refresh ? `
+                <div>
+                  <div style="font-weight: 600; color: #555; margin-bottom: 4px">Refresh Token:</div>
+                  <div><strong>Expires:</strong> ${state.tokenInfo.refresh.expiresAt.toLocaleString()}</div>
+                  <div style="margin-top: 4px">
+                    <strong>Time left:</strong>
+                    <span data-token="refresh-time" style="color: ${state.tokenInfo.refresh.isExpired ? '#d32f2f' : (state.tokenInfo.refresh.timeLeft < 300 ? '#f57c00' : '#388e3c')}">
+                      ${state.tokenInfo.refresh.isExpired ? '❌ EXPIRED' : `${state.tokenInfo.refresh.minutesLeft}m ${state.tokenInfo.refresh.secondsLeft}s`}
+                    </span>
+                  </div>
+                </div>
+              ` : `
+                <div style="color: #666">Refresh token not available or cannot be decoded</div>
+              `}
+            </div>
+          ` : ''}
         </div>
 
         <div class="settings-actions">
@@ -419,6 +566,11 @@ function attachEventListeners() {
     if (saveButton) saveButton.addEventListener('click', saveSettings);
     if (cancelButton) cancelButton.addEventListener('click', cancelSettings);
 
+    // Restart token checker if already showing token info (e.g., after storage change or render)
+    if (state.debugMode && state.isPro && state.tokenInfo) {
+      startTokenExpirationChecker();
+    }
+
     if (state.isPro) {
       const browserNameInput = document.getElementById('browserNameInput');
       if (browserNameInput) {
@@ -436,8 +588,23 @@ function attachEventListeners() {
     }
 
     if (debugModeCheckbox) {
-      debugModeCheckbox.addEventListener('change', (e) => {
+      debugModeCheckbox.addEventListener('change', async (e) => {
         state.debugMode = e.target.checked;
+
+        // Load token info if enabling debug mode in PRO
+        if (state.debugMode && state.isPro) {
+          state.tokenInfo = await getTokenExpirationInfo();
+        }
+
+        // Re-render to show/hide token info
+        render();
+
+        // Start checker if debug mode is enabled and token info is available
+        if (state.debugMode && state.isPro && state.tokenInfo) {
+          startTokenExpirationChecker();
+        } else {
+          stopTokenExpirationChecker();
+        }
       });
     }
   } else {
@@ -451,9 +618,18 @@ function attachEventListeners() {
 
     if (toggleButton) toggleButton.addEventListener('click', toggleEnabled);
     if (settingsButton) {
-      settingsButton.addEventListener('click', () => {
+      settingsButton.addEventListener('click', async () => {
+        // Load token info before showing settings
+        if (state.isPro) {
+          state.tokenInfo = await getTokenExpirationInfo();
+        }
         state.showSettings = true;
         render();
+
+        // Start token checker if debug mode is enabled and token info is available
+        if (state.debugMode && state.isPro && state.tokenInfo) {
+          startTokenExpirationChecker();
+        }
       });
     }
     if (testPageButton) {
@@ -505,9 +681,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           state.isPro = changes.isPro.newValue === true;
           render();
         }
-        if (changes.accessToken) {
+        if (changes.accessToken || changes.refreshToken) {
           const userInfo = await getUserInfoFromStorage();
           state.userEmail = userInfo?.email || null;
+
+          // Update token info if showing settings with debug mode
+          if (state.showSettings && state.debugMode && state.isPro) {
+            state.tokenInfo = await getTokenExpirationInfo();
+          }
+
           render();
         }
         if (changes.connectionStatus) {

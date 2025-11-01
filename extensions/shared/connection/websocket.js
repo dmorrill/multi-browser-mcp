@@ -23,6 +23,7 @@ export class WebSocketConnection {
     this.connectionUrl = null;
     this.reconnectTimeout = null;
     this.reconnectDelay = 5000; // 5 seconds
+    this.tokenRefreshTimer = null; // Periodic token refresh check
 
     // Command handler map - will be set by the consumer
     this.commandHandlers = new Map();
@@ -55,6 +56,83 @@ export class WebSocketConnection {
   async isExtensionEnabled() {
     const result = await this.browser.storage.local.get(['extensionEnabled']);
     return result.extensionEnabled !== false;
+  }
+
+  /**
+   * Start periodic token refresh check (every 60 seconds)
+   * Refreshes token when it has < 2 minutes remaining
+   */
+  startTokenRefreshTimer() {
+    if (this.tokenRefreshTimer) {
+      clearInterval(this.tokenRefreshTimer);
+    }
+
+    this.logger.log('[WebSocket] Starting periodic token refresh check (every 60s)');
+
+    // Check immediately, then every 60 seconds
+    this.checkAndRefreshToken();
+    this.tokenRefreshTimer = setInterval(() => {
+      this.checkAndRefreshToken();
+    }, 60000); // 60 seconds
+  }
+
+  /**
+   * Stop periodic token refresh check
+   */
+  stopTokenRefreshTimer() {
+    if (this.tokenRefreshTimer) {
+      clearInterval(this.tokenRefreshTimer);
+      this.tokenRefreshTimer = null;
+      this.logger.log('[WebSocket] Stopped periodic token refresh check');
+    }
+  }
+
+  /**
+   * Check token expiration and refresh if needed
+   * Refreshes when < 2 minutes (120 seconds) remaining
+   */
+  async checkAndRefreshToken() {
+    try {
+      const result = await this.browser.storage.local.get(['accessToken', 'refreshToken']);
+
+      if (!result.accessToken || !result.refreshToken) {
+        return; // No tokens to refresh
+      }
+
+      const payload = decodeJWT(result.accessToken);
+      if (!payload || !payload.exp) {
+        return;
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = payload.exp;
+      const timeLeft = expiresAt - now;
+
+      // Refresh if token expires within 2 minutes (120 seconds)
+      if (timeLeft < 120 && timeLeft > 0) {
+        this.logger.log(`[WebSocket] Token expires in ${timeLeft}s, triggering refresh...`);
+
+        try {
+          // Call refreshAccessToken directly to force a refresh
+          const newTokens = await refreshAccessToken(result.refreshToken);
+
+          // Save new tokens to storage (this will trigger storage.onChanged event in popup!)
+          await this.browser.storage.local.set({
+            accessToken: newTokens.access_token,
+            refreshToken: newTokens.refresh_token,
+            isPro: true
+          });
+
+          this.logger.log('[WebSocket] ✅ Token refreshed successfully via periodic check');
+        } catch (error) {
+          this.logger.log('[WebSocket] ❌ Token refresh failed:', error.message);
+        }
+      } else if (timeLeft < 0) {
+        this.logger.log('[WebSocket] ⚠️ Token already expired, will refresh on next connection');
+      }
+    } catch (error) {
+      this.logger.log('[WebSocket] Error checking token:', error);
+    }
   }
 
   /**
@@ -247,6 +325,9 @@ export class WebSocketConnection {
           }
         });
       }
+
+      // Start periodic token refresh check in PRO mode
+      this.startTokenRefreshTimer();
     }
   }
 
@@ -465,6 +546,9 @@ export class WebSocketConnection {
   _handleClose() {
     this.logger.logAlways('Disconnected');
     this.isConnected = false;
+
+    // Stop periodic token refresh check
+    this.stopTokenRefreshTimer();
 
     // Update icon manager
     if (this.iconManager) {
