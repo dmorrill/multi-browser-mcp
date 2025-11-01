@@ -1,3 +1,13 @@
+# v1.8.2 (2025-11-01)
+
+## Changes
+
+- Fix browser_reload_extensions to only reload development extensions
+- Fix dates in FEATURES.md: correct year to 2025 and development period
+- Update documentation for 2025 and remove useless Dockerfile
+- Add Chrome Web Store promotional materials and submission documentation (#7)
+
+
 # v1.8.1 (2025-11-01)
 
 ## Changes
