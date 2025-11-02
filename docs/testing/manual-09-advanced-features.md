@@ -1,7 +1,7 @@
 # Manual Test: Advanced Features
 
-**Test Count:** 10 tests
-**Tools Covered:** `browser_evaluate`, `browser_window`, `browser_pdf_save`, `browser_list_extensions`, `browser_reload_extensions`, `browser_performance_metrics`, `browser_handle_dialog`
+**Test Count:** 12 tests
+**Tools Covered:** `browser_evaluate`, `browser_window`, `browser_pdf_save`, `browser_list_extensions`, `browser_reload_extensions`, `browser_performance_metrics`, `browser_handle_dialog`, `browser_get_element_styles`
 **Prerequisites:** Server enabled, connected
 
 ---
@@ -295,6 +295,83 @@
 
 ---
 
+## MT-74: Get Element Styles
+
+**Description:** Inspect CSS styles for an element (like DevTools Styles panel)
+
+**Prerequisites:**
+- Server connected
+- Page loaded with styled elements
+
+**Steps:**
+1. Issue command: `browser_get_element_styles` with params:
+   ```json
+   {
+     "selector": "#submit-btn",
+     "property": "background-color"
+   }
+   ```
+
+**Expected Results:**
+- Shows all CSS rules that apply to the element
+- Displays cascade order (browser default → stylesheet rules)
+- Marks overridden values with `[overridden]`
+- Marks applied value with `[applied]`
+- Shows computed values with `[computed]` when different from source
+- Shows source file names (e.g., `frontend.css:9`)
+- Shows both source values (e.g., `#1c75bc`) and computed (e.g., `rgb(28, 117, 188)`)
+
+**Pass Criteria:**
+- [ ] CSS rules returned
+- [ ] Source filenames shown
+- [ ] Cascade order correct
+- [ ] Markers accurate (`[applied]`, `[overridden]`, `[computed]`)
+- [ ] Both hex and RGB values shown
+
+---
+
+## MT-75: Get Element Styles with Pseudo-State
+
+**Description:** Inspect CSS styles with forced pseudo-states (hover, focus, etc.)
+
+**Prerequisites:**
+- Server connected
+- Page loaded with hover/focus styles
+
+**Steps:**
+1. First, get normal styles:
+   ```json
+   {
+     "selector": "#hover-target"
+   }
+   ```
+2. Then, get hover styles:
+   ```json
+   {
+     "selector": "#hover-target",
+     "pseudoState": ["hover"]
+   }
+   ```
+3. Compare the results
+
+**Expected Results:**
+- Normal state shows default background-color
+- Hover state shows forced pseudo-state indicator: `Forced pseudo-state: :hover`
+- Hover state shows different background-color as `[applied]`
+- Original background-color marked as `[overridden]`
+- New hover-specific properties appear (e.g., `color: white`)
+- Pseudo-state automatically cleared after retrieval
+
+**Pass Criteria:**
+- [ ] Pseudo-state indicator shown
+- [ ] Hover styles retrieved
+- [ ] Original values marked as `[overridden]`
+- [ ] New hover values marked as `[applied]`
+- [ ] Can compare normal vs hover states
+- [ ] Supports multiple pseudo-states (e.g., `["hover", "focus"]`)
+
+---
+
 ## Notes
 
 - browser_evaluate has full page context access
@@ -304,3 +381,6 @@
 - Dialog handling must happen while dialog is open
 - Window resize affects responsive layouts
 - Evaluate can modify page state (be careful)
+- browser_get_element_styles supports filtering by property for focused debugging
+- Pseudo-states: `hover`, `focus`, `active`, `visited`, `focus-within`, `focus-visible`, `target`
+- Forced pseudo-states are automatically cleared after retrieving styles
