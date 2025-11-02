@@ -1,3 +1,10 @@
+# v1.9.4 (2025-11-02)
+
+## Changes
+
+- Add Opera browser support (#12)
+
+
 # v1.9.3 (2025-11-02)
 
 ## Changes
