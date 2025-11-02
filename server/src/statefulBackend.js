@@ -860,7 +860,7 @@ class StatefulBackend {
     }
 
     // Must be in PRO mode (proxy mode)
-    if (!this._mcpConnection) {
+    if (!this._proxyConnection) {
       return {
         content: [{
           type: 'text',
@@ -878,7 +878,7 @@ class StatefulBackend {
     try {
       // Get list of available browsers from relay
       debugLog('[StatefulBackend] Requesting list of extensions from relay...');
-      const result = await this._mcpConnection.sendRequest('list_extensions', {});
+      const result = await this._proxyConnection.sendRequest('list_extensions', {});
 
       const browsers = result.extensions || [];
       debugLog(`[StatefulBackend] Found ${browsers.length} browser(s)`);
