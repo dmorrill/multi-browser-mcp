@@ -112,6 +112,15 @@ manifest.version = '$NEW_VERSION';
 fs.writeFileSync('extensions/firefox/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
 "
 
+# Update Opera manifest.json
+echo "  → Updating extensions/opera/manifest.json..."
+node -e "
+const fs = require('fs');
+const manifest = JSON.parse(fs.readFileSync('extensions/opera/manifest.json', 'utf8'));
+manifest.version = '$NEW_VERSION';
+fs.writeFileSync('extensions/opera/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+"
+
 echo "  ✅ All versions updated to $NEW_VERSION"
 echo ""
 
@@ -169,6 +178,13 @@ echo "  ✅ Chrome extension built"
 
 # Firefox doesn't need build (vanilla JS)
 echo "  ✅ Firefox extension ready (no build needed - vanilla JS)"
+
+# Build Opera extension (uses Chrome source)
+echo "  → Building Opera extension..."
+cd extensions
+node build-opera.js > /dev/null 2>&1
+cd ..
+echo "  ✅ Opera extension built"
 echo ""
 
 # ============================================================================
@@ -196,6 +212,17 @@ zip -r ../../$FIREFOX_ZIP . -q \
   -x "*.DS_Store"
 cd ../..
 echo "  ✅ Firefox extension packaged: $FIREFOX_ZIP"
+
+# Package Opera extension
+OPERA_ZIP="releases/opera/blueprint-mcp-opera-v$NEW_VERSION.zip"
+echo "  → Creating $OPERA_ZIP..."
+cd dist/opera
+zip -r ../../$OPERA_ZIP . -q \
+  -x "*.DS_Store" \
+  -x "*.env*" \
+  -x "build-info.json"
+cd ../..
+echo "  ✅ Opera extension packaged: $OPERA_ZIP"
 echo ""
 
 # ============================================================================
@@ -213,8 +240,10 @@ git add \
   extensions/chrome/package-lock.json \
   extensions/chrome/manifest.json \
   extensions/firefox/manifest.json \
+  extensions/opera/manifest.json \
   releases/chrome/blueprint-mcp-chrome-v$NEW_VERSION.zip \
   releases/firefox/blueprint-mcp-firefox-v$NEW_VERSION.zip \
+  releases/opera/blueprint-mcp-opera-v$NEW_VERSION.zip \
   CHANGELOG.md
 
 # Commit
