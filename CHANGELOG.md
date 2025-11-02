@@ -1,3 +1,10 @@
+# v1.9.2 (2025-11-02)
+
+## Changes
+
+- Add CSS inspection tool with pseudo-state support (#10)
+
+
 # v1.9.1 (2025-11-02)
 
 ## Changes
