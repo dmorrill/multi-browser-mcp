@@ -162,6 +162,25 @@ This document catalogs all features based on git history, code analysis, and doc
 - ✅ WebRequest API (Firefox) - Firefox equivalent
 - ✅ Last 500 requests - Memory management
 
+### CSS Inspection
+- ✅ `browser_get_element_styles` - CSS DevTools-like inspection
+  - Full CSS cascade visualization
+  - Stylesheet source tracking (file names + line numbers)
+  - Content hash trimming (e.g., `frontend-abc123.css` → `frontend.css`)
+  - Property filtering - Focus on specific CSS properties
+  - Markers:
+    - `[applied]` - Final used value
+    - `[overridden]` - Overridden by more specific rules
+    - `[computed]` - Browser-computed value (when different from source)
+  - Source values + computed values (e.g., `#1c75bc` + `rgb(28, 117, 188)`)
+  - Pseudo-state support:
+    - Force pseudo-classes (`:hover`, `:focus`, `:active`, `:visited`, etc.)
+    - Automatic cleanup after inspection
+    - Multiple pseudo-states simultaneously
+    - Similar to DevTools "Toggle Element State"
+- ✅ CDP CSS.getMatchedStylesForNode - Full style information
+- ✅ CDP CSS.forcePseudoState - Pseudo-class forcing
+
 ---
 
 ## 🎯 Interactions

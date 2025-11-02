@@ -252,6 +252,34 @@ class UnifiedBackend {
         }
       },
 
+      // Element styles
+      {
+        name: 'browser_get_element_styles',
+        description: 'Get CSS styles for an element, showing which rules apply and their sources (like DevTools Styles panel). Shows matched CSS rules, specificity, and what overrides what.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: {
+              type: 'string',
+              description: 'CSS selector for the element'
+            },
+            property: {
+              type: 'string',
+              description: 'Optional: Filter to show only this CSS property (e.g., "display", "color", "background-color"). If not specified, shows all styles.'
+            },
+            pseudoState: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: ['hover', 'active', 'focus', 'visited', 'focus-within', 'focus-visible', 'target']
+              },
+              description: 'Optional: Force pseudo-states on the element (e.g., ["hover"], ["focus"], ["hover", "active"]). Similar to DevTools "Toggle Element State".'
+            }
+          },
+          required: ['selector']
+        }
+      },
+
       // Screenshot
       {
         name: 'browser_take_screenshot',
@@ -677,6 +705,10 @@ class UnifiedBackend {
 
         case 'browser_lookup':
           result = await this._handleLookup(args);
+          break;
+
+        case 'browser_get_element_styles':
+          result = await this._handleGetElementStyles(args);
           break;
 
         default:
@@ -5006,6 +5038,311 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       };
     } catch (error) {
       throw new Error(`Failed to lookup elements: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get CSS styles for an element
+   */
+  async _handleGetElementStyles(args) {
+    const selector = args.selector;
+    const propertyFilter = args.property ? args.property.toLowerCase() : null;
+
+    // Ensure pseudoState is an array
+    let pseudoState = args.pseudoState || [];
+
+    // Handle case where MCP SDK might serialize array as JSON string
+    if (typeof pseudoState === 'string') {
+      try {
+        pseudoState = JSON.parse(pseudoState);
+      } catch {
+        pseudoState = [pseudoState];
+      }
+    }
+
+    if (!Array.isArray(pseudoState)) {
+      pseudoState = [pseudoState];
+    }
+
+    try {
+      // Get matched CSS rules from extension using CDP
+      const result = await this._transport.sendCommand('forwardCDPCommand', {
+        method: 'CSS.getMatchedStylesForNode',
+        params: {
+          selector: selector,
+          pseudoState: pseudoState
+        }
+      });
+
+      const matchedRules = result.matchedCSSRules || [];
+      const inlineStyle = result.inlineStyle;
+      const inherited = result.inherited || [];
+      const stylesheets = result.stylesheets || [];
+
+      // Extract external CSS files (not inline, not Google Fonts CDN)
+      const externalCSSFiles = stylesheets
+        .filter(sheet => sheet.href &&
+                !sheet.href.includes('fonts.googleapis.com') &&
+                !sheet.href.startsWith('chrome-extension://'))
+        .map(sheet => sheet.href);
+
+      // Helper function to extract and format filename from URL
+      const extractFilename = (url) => {
+        try {
+          const urlObj = new URL(url);
+          const pathname = urlObj.pathname;
+          const parts = pathname.split('/');
+          let filename = parts[parts.length - 1] || pathname;
+
+          // Trim hash from filename if it's too long (e.g., main.abc123def.css -> main.css)
+          const match = filename.match(/^(.+?)-([a-f0-9]{32,})\.(css|js)$/i);
+          if (match) {
+            filename = `${match[1]}.${match[3]}`;
+          }
+
+          return filename;
+        } catch {
+          // If URL parsing fails, return the URL as-is
+          return url;
+        }
+      };
+
+      // Collect all properties with their sources
+      const propertyMap = new Map(); // property -> [{value, source, selector, important}]
+
+      // Process matched CSS rules (in order from least to most specific)
+      matchedRules.forEach((ruleMatch) => {
+        const rule = ruleMatch.rule;
+        if (!rule || !rule.style) return;
+
+        const cssProperties = rule.style.cssProperties || [];
+        const origin = rule.origin || 'regular';
+        const selectorText = rule.selectorList?.selectors?.map(s => s.text).join(', ') || rule.selectorList?.text || '';
+
+        // Get source info
+        let source;
+        if (origin === 'user-agent') {
+          source = 'browser default';
+        } else if (rule.styleSheetId) {
+          const lineNum = rule.style.range ? rule.style.range.startLine + 1 : '?';
+
+          // Use heuristic to determine filename from available stylesheets
+          let filename = null;
+          if (externalCSSFiles.length === 1) {
+            // If there's only one external CSS file, assume all rules come from it
+            filename = extractFilename(externalCSSFiles[0]);
+          } else if (externalCSSFiles.length > 1) {
+            // Multiple CSS files - show first one as likely source
+            filename = extractFilename(externalCSSFiles[0]);
+          }
+
+          source = filename ? `${filename}:${lineNum}` : `stylesheet #${rule.styleSheetId}:${lineNum}`;
+        } else {
+          source = origin || 'unknown';
+        }
+
+        cssProperties.forEach(prop => {
+          const propName = prop.name.toLowerCase();
+
+          // Skip empty values
+          if (!prop.value || prop.value.trim() === '') {
+            return;
+          }
+
+          // Skip if property filter specified and doesn't match
+          if (propertyFilter && propName !== propertyFilter) {
+            return;
+          }
+
+          if (!propertyMap.has(propName)) {
+            propertyMap.set(propName, []);
+          }
+
+          propertyMap.get(propName).push({
+            value: prop.value,
+            source: source,
+            selector: selectorText,
+            important: prop.important || false,
+            disabled: prop.disabled || false
+          });
+        });
+      });
+
+      // Process inline styles (highest specificity)
+      if (inlineStyle && inlineStyle.cssProperties) {
+        inlineStyle.cssProperties.forEach(prop => {
+          const propName = prop.name.toLowerCase();
+
+          // Skip empty values
+          if (!prop.value || prop.value.trim() === '') {
+            return;
+          }
+
+          // Skip if property filter specified and doesn't match
+          if (propertyFilter && propName !== propertyFilter) {
+            return;
+          }
+
+          if (!propertyMap.has(propName)) {
+            propertyMap.set(propName, []);
+          }
+
+          propertyMap.get(propName).push({
+            value: prop.value,
+            source: 'inline',
+            selector: 'element.style',
+            important: prop.important || false,
+            disabled: prop.disabled || false
+          });
+        });
+      }
+
+      // Mark computed values and filter redundant ones
+      // CDP reports both the source value (e.g., #1c75bc) and computed value (e.g., rgb(...))
+      propertyMap.forEach((values, propName) => {
+        const sourceGroups = new Map(); // key: source+selector+important -> [indices]
+
+        values.forEach((decl, index) => {
+          const key = `${decl.source}|${decl.selector}|${decl.important}`;
+          if (!sourceGroups.has(key)) {
+            sourceGroups.set(key, []);
+          }
+          sourceGroups.get(key).push(index);
+        });
+
+        // Mark computed values and remove duplicates
+        const filtered = [];
+        sourceGroups.forEach((indices) => {
+          if (indices.length > 1) {
+            // Multiple entries from same source
+            const sourceIndex = indices[0];
+            const computedIndex = indices[indices.length - 1];
+            const sourceValue = values[sourceIndex].value;
+            const computedValue = values[computedIndex].value;
+
+            // Add source value
+            filtered.push(values[sourceIndex]);
+
+            // Only add computed if it's meaningfully different
+            if (sourceValue !== computedValue) {
+              values[computedIndex].computed = true;
+              filtered.push(values[computedIndex]);
+            }
+          } else {
+            // Single entry - just add it
+            filtered.push(values[indices[0]]);
+          }
+        });
+
+        propertyMap.set(propName, filtered);
+      });
+
+      // Build output
+      let output = `### Element Styles: \`${selector}\`\n\n`;
+
+      if (propertyFilter) {
+        output += `**Filtered by property:** \`${propertyFilter}\`\n\n`;
+      }
+
+      if (pseudoState.length > 0) {
+        const stateList = pseudoState.map(s => `:${s}`).join(', ');
+        output += `**Forced pseudo-state:** \`${stateList}\`\n\n`;
+      }
+
+      if (propertyMap.size === 0) {
+        if (propertyFilter) {
+          output += `No CSS property \`${propertyFilter}\` found for this element.\n`;
+        } else {
+          output += `No CSS styles found for this element.\n`;
+        }
+
+        return {
+          content: [{
+            type: 'text',
+            text: output
+          }],
+          isError: false
+        };
+      }
+
+      output += `Found ${propertyMap.size} CSS ${propertyMap.size === 1 ? 'property' : 'properties'}:\n\n`;
+
+      // Sort properties alphabetically
+      const sortedProperties = Array.from(propertyMap.entries()).sort((a, b) =>
+        a[0].localeCompare(b[0])
+      );
+
+      sortedProperties.forEach(([propName, values]) => {
+        output += `\n${propName}:\n`;
+
+        // Find the final applied value (last non-computed, or last overall)
+        let appliedIndex = values.length - 1;
+        for (let i = values.length - 1; i >= 0; i--) {
+          if (!values[i].computed) {
+            appliedIndex = i;
+            break;
+          }
+        }
+
+        // Show each declaration for this property (last one wins unless !important)
+        values.forEach((decl, index) => {
+          const important = decl.important ? ' !important' : '';
+          const disabled = decl.disabled ? ' [disabled]' : '';
+
+          // Determine markers
+          const markers = [];
+
+          if (decl.computed) {
+            markers.push('[computed]');
+          }
+
+          // Check if this is the applied value
+          const isApplied = index === appliedIndex;
+          if (isApplied && !decl.important) {
+            markers.push('[applied]');
+          }
+
+          // Check if this value is overridden
+          if (!decl.important && !isApplied) {
+            // Check if there's another value after this one's pair
+            let nextDifferentRuleIndex = index + 1;
+
+            // Skip the computed pair if this is the source value
+            if (!decl.computed && nextDifferentRuleIndex < values.length) {
+              const nextDecl = values[nextDifferentRuleIndex];
+              if (nextDecl.computed &&
+                  nextDecl.source === decl.source &&
+                  nextDecl.selector === decl.selector) {
+                nextDifferentRuleIndex++;
+              }
+            }
+
+            // If there's another rule after this one, it's overridden
+            if (nextDifferentRuleIndex < values.length) {
+              markers.push('[overridden]');
+            }
+          }
+
+          const markerStr = markers.length > 0 ? ' ' + markers.join(' ') : '';
+
+          output += `  ${decl.value}${important}${disabled}${markerStr}\n`;
+          output += `    ${decl.source}`;
+          if (decl.selector && decl.selector !== 'element.style') {
+            output += ` - ${decl.selector}`;
+          }
+          output += `\n`;
+        });
+      });
+
+      return {
+        content: [{
+          type: 'text',
+          text: output
+        }],
+        isError: false
+      };
+    } catch (error) {
+      throw new Error(`Failed to get element styles: ${error.message}`);
     }
   }
 

@@ -581,6 +581,137 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
       }
     }
 
+    case 'CSS.getMatchedStylesForNode': {
+      // Get matched CSS styles for a node
+      await ensureDebuggerAttached();
+
+      const selector = cdpParams.selector;
+      const pseudoState = cdpParams.pseudoState || [];
+
+      let nodeId = null;
+
+      try {
+        // First, enable DOM and CSS domains
+        await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.enable',
+          {}
+        );
+
+        await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'CSS.enable',
+          {}
+        );
+
+        // Get document node
+        const docResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.getDocument',
+          { depth: 0 }
+        );
+
+        const rootNodeId = docResult.root.nodeId;
+
+        // Query selector to get the target node ID
+        const queryResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.querySelector',
+          { nodeId: rootNodeId, selector: selector }
+        );
+
+        if (!queryResult.nodeId || queryResult.nodeId === 0) {
+          throw new Error(`Element not found for selector: ${selector}`);
+        }
+
+        nodeId = queryResult.nodeId;
+
+        // Force pseudo-state if requested (like DevTools "Toggle Element State")
+        if (pseudoState.length > 0) {
+          console.log('[Background Module] Forcing pseudo-state:', pseudoState, 'type:', typeof pseudoState, 'isArray:', Array.isArray(pseudoState));
+
+          // Ensure pseudoState is an array
+          const pseudoArray = Array.isArray(pseudoState) ? pseudoState : [pseudoState];
+
+          await chrome.debugger.sendCommand(
+            { tabId: attachedTabId },
+            'CSS.forcePseudoState',
+            {
+              nodeId: nodeId,
+              forcedPseudoClasses: pseudoArray
+            }
+          );
+        }
+
+        // Get matched styles for the node
+        const stylesResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'CSS.getMatchedStylesForNode',
+          { nodeId: nodeId }
+        );
+
+        // Get stylesheet URLs using document.styleSheets
+        // This gives us the actual URLs, but we need to match them to styleSheetIds
+        const stylesheetInfo = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'Runtime.evaluate',
+          {
+            expression: `
+              Array.from(document.styleSheets).map((sheet, index) => {
+                try {
+                  return {
+                    index: index,
+                    href: sheet.href,
+                    title: sheet.title,
+                    disabled: sheet.disabled,
+                    ruleCount: sheet.cssRules ? sheet.cssRules.length : 0
+                  };
+                } catch (e) {
+                  return {
+                    index: index,
+                    href: sheet.href,
+                    title: sheet.title,
+                    error: e.message
+                  };
+                }
+              })
+            `,
+            returnByValue: true
+          }
+        );
+
+        const stylesheets = stylesheetInfo.result?.value || [];
+
+        return {
+          nodeId: nodeId,
+          matchedCSSRules: stylesResult.matchedCSSRules || [],
+          inlineStyle: stylesResult.inlineStyle || null,
+          inherited: stylesResult.inherited || [],
+          stylesheets: stylesheets
+        };
+      } catch (error) {
+        console.error('[Background Module] Error getting styles:', error);
+        throw error;
+      } finally {
+        // Clear forced pseudo-state if it was set
+        if (nodeId && pseudoState.length > 0) {
+          try {
+            await chrome.debugger.sendCommand(
+              { tabId: attachedTabId },
+              'CSS.forcePseudoState',
+              {
+                nodeId: nodeId,
+                forcedPseudoClasses: []
+              }
+            );
+          } catch (cleanupError) {
+            // Ignore cleanup errors (element may have been removed, etc.)
+            console.warn('[Background Module] Error clearing forced pseudo-state:', cleanupError);
+          }
+        }
+      }
+    }
+
     case 'Network.enable': {
       // Enable Network domain in Chrome debugger
       await ensureDebuggerAttached();
