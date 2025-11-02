@@ -266,6 +266,14 @@ class UnifiedBackend {
             property: {
               type: 'string',
               description: 'Optional: Filter to show only this CSS property (e.g., "display", "color", "background-color"). If not specified, shows all styles.'
+            },
+            pseudoState: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: ['hover', 'active', 'focus', 'visited', 'focus-within', 'focus-visible', 'target']
+              },
+              description: 'Optional: Force pseudo-states on the element (e.g., ["hover"], ["focus"], ["hover", "active"]). Similar to DevTools "Toggle Element State".'
             }
           },
           required: ['selector']
@@ -5040,11 +5048,30 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
     const selector = args.selector;
     const propertyFilter = args.property ? args.property.toLowerCase() : null;
 
+    // Ensure pseudoState is an array
+    let pseudoState = args.pseudoState || [];
+
+    // Handle case where MCP SDK might serialize array as JSON string
+    if (typeof pseudoState === 'string') {
+      try {
+        pseudoState = JSON.parse(pseudoState);
+      } catch {
+        pseudoState = [pseudoState];
+      }
+    }
+
+    if (!Array.isArray(pseudoState)) {
+      pseudoState = [pseudoState];
+    }
+
     try {
       // Get matched CSS rules from extension using CDP
       const result = await this._transport.sendCommand('forwardCDPCommand', {
         method: 'CSS.getMatchedStylesForNode',
-        params: { selector: selector }
+        params: {
+          selector: selector,
+          pseudoState: pseudoState
+        }
       });
 
       const matchedRules = result.matchedCSSRules || [];
@@ -5215,6 +5242,11 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
 
       if (propertyFilter) {
         output += `**Filtered by property:** \`${propertyFilter}\`\n\n`;
+      }
+
+      if (pseudoState.length > 0) {
+        const stateList = pseudoState.map(s => `:${s}`).join(', ');
+        output += `**Forced pseudo-state:** \`${stateList}\`\n\n`;
       }
 
       if (propertyMap.size === 0) {

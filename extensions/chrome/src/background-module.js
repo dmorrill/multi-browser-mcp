@@ -586,6 +586,9 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
       await ensureDebuggerAttached();
 
       const selector = cdpParams.selector;
+      const pseudoState = cdpParams.pseudoState || [];
+
+      let nodeId = null;
 
       try {
         // First, enable DOM and CSS domains
@@ -621,7 +624,24 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
           throw new Error(`Element not found for selector: ${selector}`);
         }
 
-        const nodeId = queryResult.nodeId;
+        nodeId = queryResult.nodeId;
+
+        // Force pseudo-state if requested (like DevTools "Toggle Element State")
+        if (pseudoState.length > 0) {
+          console.log('[Background Module] Forcing pseudo-state:', pseudoState, 'type:', typeof pseudoState, 'isArray:', Array.isArray(pseudoState));
+
+          // Ensure pseudoState is an array
+          const pseudoArray = Array.isArray(pseudoState) ? pseudoState : [pseudoState];
+
+          await chrome.debugger.sendCommand(
+            { tabId: attachedTabId },
+            'CSS.forcePseudoState',
+            {
+              nodeId: nodeId,
+              forcedPseudoClasses: pseudoArray
+            }
+          );
+        }
 
         // Get matched styles for the node
         const stylesResult = await chrome.debugger.sendCommand(
@@ -672,6 +692,23 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
       } catch (error) {
         console.error('[Background Module] Error getting styles:', error);
         throw error;
+      } finally {
+        // Clear forced pseudo-state if it was set
+        if (nodeId && pseudoState.length > 0) {
+          try {
+            await chrome.debugger.sendCommand(
+              { tabId: attachedTabId },
+              'CSS.forcePseudoState',
+              {
+                nodeId: nodeId,
+                forcedPseudoClasses: []
+              }
+            );
+          } catch (cleanupError) {
+            // Ignore cleanup errors (element may have been removed, etc.)
+            console.warn('[Background Module] Error clearing forced pseudo-state:', cleanupError);
+          }
+        }
       }
     }
 
