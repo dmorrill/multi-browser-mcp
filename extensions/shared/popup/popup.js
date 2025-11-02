@@ -1,6 +1,22 @@
 // Browser API adapter - works with both Chrome and Firefox
 const browserAPI = typeof chrome !== 'undefined' ? chrome : browser;
-const browserName = typeof chrome !== 'undefined' && chrome.runtime ? 'Chrome' : 'Firefox';
+
+// Get browser name from manifest - same logic as background script
+function detectBrowserName() {
+  const manifest = browserAPI.runtime.getManifest();
+  const manifestName = manifest.name || '';
+
+  // Extract browser name from "Blueprint MCP for X" pattern
+  const match = manifestName.match(/Blueprint MCP for (\w+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  // Fallback to simple detection
+  return typeof chrome !== 'undefined' && chrome.runtime ? 'Chrome' : 'Firefox';
+}
+
+const browserName = detectBrowserName();
 
 // Logging utility - only logs if debug mode is enabled
 function log(...args) {
@@ -327,7 +343,7 @@ function renderSettings() {
   return `
     <div class="popup-container">
       <div class="popup-header">
-        <img src="icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
+        <img src="/icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
         <h1>Blueprint MCP<span class="version-label">v${state.version}</span></h1>
       </div>
 
@@ -341,7 +357,7 @@ function renderSettings() {
                 class="settings-input"
                 id="browserNameInput"
                 value="${state.browserName}"
-                placeholder="Firefox"
+                placeholder="${browserName}"
               />
             </label>
           ` : `
@@ -433,7 +449,7 @@ function renderMain() {
   return `
     <div class="popup-container">
       <div class="popup-header">
-        <img src="icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
+        <img src="/icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
         <h1>Blueprint MCP<span class="version-label">v${state.version}</span></h1>
       </div>
 

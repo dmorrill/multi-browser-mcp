@@ -120,6 +120,18 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     return { success: true };
   }
 
+  // Handle connection status request from popup
+  if (message.type === 'getConnectionStatus') {
+    const attachedTabId = tabHandlers.getAttachedTabId();
+    const status = {
+      connected: wsConnection.isConnected,
+      connectedTabId: attachedTabId,
+      stealthMode: attachedTabId ? (tabHandlers.tabStealthModes[attachedTabId] || false) : false,
+      projectName: wsConnection.projectName
+    };
+    return status;
+  }
+
   // Handle focus tab request from content script
   if (message.type === 'focusTab' && sender.tab) {
     logger.log('[Background] Focus tab request');

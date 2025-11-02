@@ -15,6 +15,7 @@ Blueprint MCP for Chrome is an MCP (Model Context Protocol) server + browser ext
 **Supported Browsers:**
 - ✅ Chrome - TypeScript extension (4,000 lines + build step)
 - ✅ Firefox - Vanilla JS extension (2,000 lines, no build)
+- ✅ Opera - Uses Chrome source code (Chromium-based)
 - 🚧 Safari - Planned (will share vanilla JS code with Chrome rewrite)
 
 **Key Features:**
