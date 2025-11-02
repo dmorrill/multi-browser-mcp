@@ -581,6 +581,67 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
       }
     }
 
+    case 'CSS.getMatchedStylesForNode': {
+      // Get matched CSS styles for a node
+      await ensureDebuggerAttached();
+
+      const selector = cdpParams.selector;
+
+      try {
+        // First, enable DOM and CSS domains
+        await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.enable',
+          {}
+        );
+
+        await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'CSS.enable',
+          {}
+        );
+
+        // Get document node
+        const docResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.getDocument',
+          { depth: 0 }
+        );
+
+        const rootNodeId = docResult.root.nodeId;
+
+        // Query selector to get the target node ID
+        const queryResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'DOM.querySelector',
+          { nodeId: rootNodeId, selector: selector }
+        );
+
+        if (!queryResult.nodeId || queryResult.nodeId === 0) {
+          throw new Error(`Element not found for selector: ${selector}`);
+        }
+
+        const nodeId = queryResult.nodeId;
+
+        // Get matched styles for the node
+        const stylesResult = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'CSS.getMatchedStylesForNode',
+          { nodeId: nodeId }
+        );
+
+        return {
+          nodeId: nodeId,
+          matchedCSSRules: stylesResult.matchedCSSRules || [],
+          inlineStyle: stylesResult.inlineStyle || null,
+          inherited: stylesResult.inherited || []
+        };
+      } catch (error) {
+        console.error('[Background Module] Error getting styles:', error);
+        throw error;
+      }
+    }
+
     case 'Network.enable': {
       // Enable Network domain in Chrome debugger
       await ensureDebuggerAttached();
