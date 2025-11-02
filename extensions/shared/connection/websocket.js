@@ -585,9 +585,16 @@ export class WebSocketConnection {
    */
   _getBrowserName() {
     // Detect browser type
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
+    // Check Opera first (Chromium-based, has window.opr or OPR in user agent)
+    if ((typeof opr !== 'undefined' && opr.addons) || navigator.userAgent.indexOf('OPR') !== -1) {
+      return 'Opera';
+    }
+    // Check Chrome (also matches Edge, Brave, etc. but they're less common)
+    else if (typeof chrome !== 'undefined' && chrome.runtime) {
       return 'Chrome';
-    } else if (typeof browser !== 'undefined' && browser.runtime) {
+    }
+    // Check Firefox (uses browser API instead of chrome)
+    else if (typeof browser !== 'undefined' && browser.runtime) {
       return 'Firefox';
     }
     return 'Unknown';
