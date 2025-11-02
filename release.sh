@@ -251,7 +251,7 @@ git commit -m "Release v$NEW_VERSION
 
 - Bump version to $NEW_VERSION
 - Update CHANGELOG
-- Package Chrome and Firefox extensions for store submission"
+- Package Chrome, Firefox, and Opera extensions for store submission"
 
 echo "  ✅ Changes committed"
 
@@ -321,6 +321,7 @@ echo "  • Version: $NEW_VERSION"
 echo "  • Git tag: v$NEW_VERSION"
 echo "  • Chrome zip: $CHROME_ZIP"
 echo "  • Firefox zip: $FIREFOX_ZIP"
+echo "  • Opera zip: $OPERA_ZIP"
 echo ""
 echo "📝 Next steps:"
 echo "  1. Upload Chrome extension to Chrome Web Store:"
@@ -331,7 +332,11 @@ echo "  2. Upload Firefox extension to Firefox Add-ons:"
 echo "     → Open: https://addons.mozilla.org/developers"
 echo "     → Upload: $FIREFOX_ZIP"
 echo ""
-echo "  3. Update GitHub release notes:"
+echo "  3. Upload Opera extension to Opera Add-ons:"
+echo "     → Open: https://addons.opera.com/developer"
+echo "     → Upload: $OPERA_ZIP"
+echo ""
+echo "  4. Update GitHub release notes:"
 echo "     → Open: https://github.com/railsblueprint/blueprint-mcp/releases/tag/v$NEW_VERSION"
 echo "     → Add release notes from CHANGELOG.md"
 echo ""
