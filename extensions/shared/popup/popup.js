@@ -357,7 +357,7 @@ function renderSettings() {
                 class="settings-input"
                 id="browserNameInput"
                 value="${state.browserName}"
-                placeholder="Firefox"
+                placeholder="${browserName}"
               />
             </label>
           ` : `
