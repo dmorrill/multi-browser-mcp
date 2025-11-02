@@ -458,8 +458,8 @@ export class WebSocketConnection {
    * Handle authenticate command (PRO mode)
    */
   async _handleAuthenticate() {
-    // Get stored tokens and browser name from browser.storage
-    const result = await this.browser.storage.local.get(['accessToken', 'refreshToken', 'browserName', 'stableClientId']);
+    // Get stored tokens from browser.storage
+    const result = await this.browser.storage.local.get(['accessToken', 'refreshToken', 'stableClientId']);
 
     if (!result.accessToken) {
       throw new Error('No authentication tokens found. Please login via MCP client first.');
@@ -507,7 +507,8 @@ export class WebSocketConnection {
       throw new Error('Authentication failed: Token expired. Please login again.');
     }
 
-    const browserName = result.browserName || this._getBrowserName();
+    // Always get browser name from manifest (most reliable)
+    const browserName = this._getBrowserName();
 
     // Get or generate stable client_id
     let clientId = result.stableClientId;
@@ -581,10 +582,24 @@ export class WebSocketConnection {
   }
 
   /**
-   * Get browser name
+   * Get browser name from manifest
+   * This is more reliable than user agent detection
    */
   _getBrowserName() {
-    // Detect browser type
+    // Get browser name from manifest.json name field
+    // e.g. "Blueprint MCP for Chrome" -> "Chrome"
+    //      "Blueprint MCP for Opera" -> "Opera"
+    //      "Blueprint MCP for Firefox" -> "Firefox"
+    const manifest = this.browser.runtime.getManifest();
+    const manifestName = manifest.name || '';
+
+    // Extract browser name from "Blueprint MCP for X" pattern
+    const match = manifestName.match(/Blueprint MCP for (\w+)/);
+    if (match && match[1]) {
+      return match[1];
+    }
+
+    // Fallback to user agent detection if manifest doesn't match pattern
     // Check Opera first (Chromium-based, has window.opr or OPR in user agent)
     if ((typeof opr !== 'undefined' && opr.addons) || navigator.userAgent.indexOf('OPR') !== -1) {
       return 'Opera';
