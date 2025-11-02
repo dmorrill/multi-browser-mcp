@@ -292,8 +292,20 @@ class UnifiedBackend {
       // Console
       {
         name: 'browser_console_messages',
-        description: 'Get console messages from the page',
-        inputSchema: { type: 'object', properties: {} }
+        description: 'Get console messages from the page. Supports pagination for large console outputs.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            limit: {
+              type: 'number',
+              description: 'Maximum number of messages to return (default: 50)'
+            },
+            offset: {
+              type: 'number',
+              description: 'Number of messages to skip (default: 0)'
+            }
+          }
+        }
       },
 
       // Forms
@@ -591,7 +603,7 @@ class UnifiedBackend {
           break;
 
         case 'browser_console_messages':
-          result = await this._handleConsoleMessages();
+          result = await this._handleConsoleMessages(args);
           break;
 
         // Forms
@@ -3428,11 +3440,11 @@ class UnifiedBackend {
     };
   }
 
-  async _handleConsoleMessages() {
+  async _handleConsoleMessages(args = {}) {
     const result = await this._transport.sendCommand('getConsoleMessages');
-    const messages = result.messages || [];
+    const allMessages = result.messages || [];
 
-    if (messages.length === 0) {
+    if (allMessages.length === 0) {
       return {
         content: [{
           type: 'text',
@@ -3441,6 +3453,13 @@ class UnifiedBackend {
         isError: false
       };
     }
+
+    // Apply pagination
+    const limit = args.limit !== undefined ? args.limit : 50;
+    const offset = args.offset !== undefined ? args.offset : 0;
+    const messages = allMessages.slice(offset, offset + limit);
+    const hasMore = (offset + limit) < allMessages.length;
+    const remaining = hasMore ? allMessages.length - (offset + limit) : 0;
 
     const messageText = messages.map(msg => {
       const location = msg.url && msg.lineNumber !== undefined
@@ -3451,10 +3470,19 @@ class UnifiedBackend {
       return `[${timestamp}] [${level}] ${msg.text}${location}`;
     }).join('\n');
 
+    let text = `### Console Messages\n\n`;
+    text += `**Total:** ${allMessages.length} message(s)\n`;
+    text += `**Showing:** ${messages.length} message(s) (offset: ${offset}, limit: ${limit})\n`;
+    if (hasMore) {
+      text += `**Remaining:** ${remaining} more message(s) available\n`;
+      text += `\n💡 **Tip:** Use \`limit\` and \`offset\` parameters to fetch more messages\n`;
+    }
+    text += `\n${messageText}`;
+
     return {
       content: [{
         type: 'text',
-        text: `### Console Messages\n\nCaptured ${messages.length} message(s):\n\n${messageText}`
+        text: text
       }],
       isError: false
     };
