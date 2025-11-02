@@ -292,10 +292,23 @@ class UnifiedBackend {
       // Console
       {
         name: 'browser_console_messages',
-        description: 'Get console messages from the page. Supports pagination for large console outputs.',
+        description: 'Get console messages from the page. Supports filtering and pagination for large console outputs.',
         inputSchema: {
           type: 'object',
           properties: {
+            level: {
+              type: 'string',
+              description: 'Filter by message level (log, warn, error, info, debug)',
+              enum: ['log', 'warn', 'error', 'info', 'debug']
+            },
+            text: {
+              type: 'string',
+              description: 'Filter messages containing this text (case-insensitive substring search)'
+            },
+            url: {
+              type: 'string',
+              description: 'Filter messages from URLs containing this text (case-insensitive substring search)'
+            },
             limit: {
               type: 'number',
               description: 'Maximum number of messages to return (default: 50)'
@@ -3442,9 +3455,10 @@ class UnifiedBackend {
 
   async _handleConsoleMessages(args = {}) {
     const result = await this._transport.sendCommand('getConsoleMessages');
-    const allMessages = result.messages || [];
+    let allMessages = result.messages || [];
+    const totalBeforeFilter = allMessages.length;
 
-    if (allMessages.length === 0) {
+    if (totalBeforeFilter === 0) {
       return {
         content: [{
           type: 'text',
@@ -3454,12 +3468,54 @@ class UnifiedBackend {
       };
     }
 
+    // Apply filters
+    if (args.level) {
+      allMessages = allMessages.filter(msg => {
+        const msgLevel = (msg.level || msg.type || 'log').toLowerCase();
+        return msgLevel === args.level.toLowerCase();
+      });
+    }
+
+    if (args.text) {
+      const searchText = args.text.toLowerCase();
+      allMessages = allMessages.filter(msg =>
+        msg.text && msg.text.toLowerCase().includes(searchText)
+      );
+    }
+
+    if (args.url) {
+      const searchUrl = args.url.toLowerCase();
+      allMessages = allMessages.filter(msg =>
+        msg.url && msg.url.toLowerCase().includes(searchUrl)
+      );
+    }
+
+    const filteredCount = allMessages.length;
+
+    if (filteredCount === 0) {
+      let text = `### Console Messages\n\n`;
+      text += `**Total:** ${totalBeforeFilter} message(s)\n`;
+      text += `**Filtered:** 0 messages match the filters\n\n`;
+
+      if (args.level) text += `- Level: ${args.level}\n`;
+      if (args.text) text += `- Text contains: "${args.text}"\n`;
+      if (args.url) text += `- URL contains: "${args.url}"\n`;
+
+      return {
+        content: [{
+          type: 'text',
+          text: text
+        }],
+        isError: false
+      };
+    }
+
     // Apply pagination
     const limit = args.limit !== undefined ? args.limit : 50;
     const offset = args.offset !== undefined ? args.offset : 0;
     const messages = allMessages.slice(offset, offset + limit);
-    const hasMore = (offset + limit) < allMessages.length;
-    const remaining = hasMore ? allMessages.length - (offset + limit) : 0;
+    const hasMore = (offset + limit) < filteredCount;
+    const remaining = hasMore ? filteredCount - (offset + limit) : 0;
 
     const messageText = messages.map(msg => {
       const location = msg.url && msg.lineNumber !== undefined
@@ -3471,7 +3527,16 @@ class UnifiedBackend {
     }).join('\n');
 
     let text = `### Console Messages\n\n`;
-    text += `**Total:** ${allMessages.length} message(s)\n`;
+    text += `**Total:** ${totalBeforeFilter} message(s)\n`;
+
+    // Show filter info if filters applied
+    if (args.level || args.text || args.url) {
+      text += `**Filtered:** ${filteredCount} message(s) matching:\n`;
+      if (args.level) text += `  - Level: ${args.level}\n`;
+      if (args.text) text += `  - Text contains: "${args.text}"\n`;
+      if (args.url) text += `  - URL contains: "${args.url}"\n`;
+    }
+
     text += `**Showing:** ${messages.length} message(s) (offset: ${offset}, limit: ${limit})\n`;
     if (hasMore) {
       text += `**Remaining:** ${remaining} more message(s) available\n`;
