@@ -327,7 +327,7 @@ function renderSettings() {
   return `
     <div class="popup-container">
       <div class="popup-header">
-        <img src="icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
+        <img src="/icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
         <h1>Blueprint MCP<span class="version-label">v${state.version}</span></h1>
       </div>
 
@@ -433,7 +433,7 @@ function renderMain() {
   return `
     <div class="popup-container">
       <div class="popup-header">
-        <img src="icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
+        <img src="/icons/icon-32.png" alt="Blueprint MCP" class="header-icon" />
         <h1>Blueprint MCP<span class="version-label">v${state.version}</span></h1>
       </div>
 
