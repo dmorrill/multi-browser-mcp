@@ -5050,6 +5050,35 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       const matchedRules = result.matchedCSSRules || [];
       const inlineStyle = result.inlineStyle;
       const inherited = result.inherited || [];
+      const stylesheets = result.stylesheets || [];
+
+      // Extract external CSS files (not inline, not Google Fonts CDN)
+      const externalCSSFiles = stylesheets
+        .filter(sheet => sheet.href &&
+                !sheet.href.includes('fonts.googleapis.com') &&
+                !sheet.href.startsWith('chrome-extension://'))
+        .map(sheet => sheet.href);
+
+      // Helper function to extract and format filename from URL
+      const extractFilename = (url) => {
+        try {
+          const urlObj = new URL(url);
+          const pathname = urlObj.pathname;
+          const parts = pathname.split('/');
+          let filename = parts[parts.length - 1] || pathname;
+
+          // Trim hash from filename if it's too long (e.g., main.abc123def.css -> main.css)
+          const match = filename.match(/^(.+?)-([a-f0-9]{32,})\.(css|js)$/i);
+          if (match) {
+            filename = `${match[1]}.${match[3]}`;
+          }
+
+          return filename;
+        } catch {
+          // If URL parsing fails, return the URL as-is
+          return url;
+        }
+      };
 
       // Collect all properties with their sources
       const propertyMap = new Map(); // property -> [{value, source, selector, important}]
@@ -5069,7 +5098,18 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
           source = 'browser default';
         } else if (rule.styleSheetId) {
           const lineNum = rule.style.range ? rule.style.range.startLine + 1 : '?';
-          source = `stylesheet #${rule.styleSheetId}:${lineNum}`;
+
+          // Use heuristic to determine filename from available stylesheets
+          let filename = null;
+          if (externalCSSFiles.length === 1) {
+            // If there's only one external CSS file, assume all rules come from it
+            filename = extractFilename(externalCSSFiles[0]);
+          } else if (externalCSSFiles.length > 1) {
+            // Multiple CSS files - show first one as likely source
+            filename = extractFilename(externalCSSFiles[0]);
+          }
+
+          source = filename ? `${filename}:${lineNum}` : `stylesheet #${rule.styleSheetId}:${lineNum}`;
         } else {
           source = origin || 'unknown';
         }
@@ -5130,6 +5170,46 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
         });
       }
 
+      // Mark computed values and filter redundant ones
+      // CDP reports both the source value (e.g., #1c75bc) and computed value (e.g., rgb(...))
+      propertyMap.forEach((values, propName) => {
+        const sourceGroups = new Map(); // key: source+selector+important -> [indices]
+
+        values.forEach((decl, index) => {
+          const key = `${decl.source}|${decl.selector}|${decl.important}`;
+          if (!sourceGroups.has(key)) {
+            sourceGroups.set(key, []);
+          }
+          sourceGroups.get(key).push(index);
+        });
+
+        // Mark computed values and remove duplicates
+        const filtered = [];
+        sourceGroups.forEach((indices) => {
+          if (indices.length > 1) {
+            // Multiple entries from same source
+            const sourceIndex = indices[0];
+            const computedIndex = indices[indices.length - 1];
+            const sourceValue = values[sourceIndex].value;
+            const computedValue = values[computedIndex].value;
+
+            // Add source value
+            filtered.push(values[sourceIndex]);
+
+            // Only add computed if it's meaningfully different
+            if (sourceValue !== computedValue) {
+              values[computedIndex].computed = true;
+              filtered.push(values[computedIndex]);
+            }
+          } else {
+            // Single entry - just add it
+            filtered.push(values[indices[0]]);
+          }
+        });
+
+        propertyMap.set(propName, filtered);
+      });
+
       // Build output
       let output = `### Element Styles: \`${selector}\`\n\n`;
 
@@ -5163,14 +5243,57 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       sortedProperties.forEach(([propName, values]) => {
         output += `\n${propName}:\n`;
 
+        // Find the final applied value (last non-computed, or last overall)
+        let appliedIndex = values.length - 1;
+        for (let i = values.length - 1; i >= 0; i--) {
+          if (!values[i].computed) {
+            appliedIndex = i;
+            break;
+          }
+        }
+
         // Show each declaration for this property (last one wins unless !important)
         values.forEach((decl, index) => {
-          const isOverridden = index < values.length - 1 && !decl.important;
           const important = decl.important ? ' !important' : '';
           const disabled = decl.disabled ? ' [disabled]' : '';
-          const overriddenMark = isOverridden ? ' [overridden]' : '';
 
-          output += `  ${decl.value}${important}${disabled}${overriddenMark}\n`;
+          // Determine markers
+          const markers = [];
+
+          if (decl.computed) {
+            markers.push('[computed]');
+          }
+
+          // Check if this is the applied value
+          const isApplied = index === appliedIndex;
+          if (isApplied && !decl.important) {
+            markers.push('[applied]');
+          }
+
+          // Check if this value is overridden
+          if (!decl.important && !isApplied) {
+            // Check if there's another value after this one's pair
+            let nextDifferentRuleIndex = index + 1;
+
+            // Skip the computed pair if this is the source value
+            if (!decl.computed && nextDifferentRuleIndex < values.length) {
+              const nextDecl = values[nextDifferentRuleIndex];
+              if (nextDecl.computed &&
+                  nextDecl.source === decl.source &&
+                  nextDecl.selector === decl.selector) {
+                nextDifferentRuleIndex++;
+              }
+            }
+
+            // If there's another rule after this one, it's overridden
+            if (nextDifferentRuleIndex < values.length) {
+              markers.push('[overridden]');
+            }
+          }
+
+          const markerStr = markers.length > 0 ? ' ' + markers.join(' ') : '';
+
+          output += `  ${decl.value}${important}${disabled}${markerStr}\n`;
           output += `    ${decl.source}`;
           if (decl.selector && decl.selector !== 'element.style') {
             output += ` - ${decl.selector}`;

@@ -630,11 +630,44 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
           { nodeId: nodeId }
         );
 
+        // Get stylesheet URLs using document.styleSheets
+        // This gives us the actual URLs, but we need to match them to styleSheetIds
+        const stylesheetInfo = await chrome.debugger.sendCommand(
+          { tabId: attachedTabId },
+          'Runtime.evaluate',
+          {
+            expression: `
+              Array.from(document.styleSheets).map((sheet, index) => {
+                try {
+                  return {
+                    index: index,
+                    href: sheet.href,
+                    title: sheet.title,
+                    disabled: sheet.disabled,
+                    ruleCount: sheet.cssRules ? sheet.cssRules.length : 0
+                  };
+                } catch (e) {
+                  return {
+                    index: index,
+                    href: sheet.href,
+                    title: sheet.title,
+                    error: e.message
+                  };
+                }
+              })
+            `,
+            returnByValue: true
+          }
+        );
+
+        const stylesheets = stylesheetInfo.result?.value || [];
+
         return {
           nodeId: nodeId,
           matchedCSSRules: stylesResult.matchedCSSRules || [],
           inlineStyle: stylesResult.inlineStyle || null,
-          inherited: stylesResult.inherited || []
+          inherited: stylesResult.inherited || [],
+          stylesheets: stylesheets
         };
       } catch (error) {
         console.error('[Background Module] Error getting styles:', error);
