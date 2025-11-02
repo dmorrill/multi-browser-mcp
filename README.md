@@ -1,13 +1,13 @@
-# Blueprint MCP for Chrome
+# Blueprint MCP
 
-> Control your real Chrome browser with AI through the Model Context Protocol
+> Control your real browser with AI through the Model Context Protocol
 
 [![npm version](https://badge.fury.io/js/@railsblueprint%2Fblueprint-mcp.svg)](https://www.npmjs.com/package/@railsblueprint/blueprint-mcp)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## What is this?
 
-An MCP (Model Context Protocol) server that lets AI assistants control your actual Chrome browser through a browser extension. Unlike headless automation tools, this uses your real browser profile with all your logged-in sessions, cookies, and extensions intact.
+An MCP (Model Context Protocol) server that lets AI assistants control your actual browser (Chrome, Firefox, or Opera) through a browser extension. Unlike headless automation tools, this uses your real browser profile with all your logged-in sessions, cookies, and extensions intact.
 
 **Perfect for:** AI agents that need to interact with sites where you're already logged in, or that need to avoid bot detection.
 
@@ -20,7 +20,7 @@ An MCP (Model Context Protocol) server that lets AI assistants control your actu
 | ✅ Avoids bot detection (uses real fingerprint) | ⚠️ Often detected as automated browser |
 | ✅ Works with your existing browser extensions | ❌ No extension support |
 | ✅ Zero setup - works out of the box | ⚠️ Requires browser installation |
-| ❌ Chrome/Edge only | ✅ Chrome, Firefox, Safari support |
+| ✅ Chrome, Firefox, Opera support | ✅ Chrome, Firefox, Safari support |
 
 ## Installation
 
@@ -30,17 +30,20 @@ An MCP (Model Context Protocol) server that lets AI assistants control your actu
 npm install -g @railsblueprint/blueprint-mcp
 ```
 
-### 2. Install the Chrome Extension
+### 2. Install the Browser Extension
 
-**Option A: Chrome Web Store (Recommended)**
-- Visit: [Chrome Web Store link - Coming Soon]
+Choose your browser:
 
-**Option B: Manual Installation (Development)**
-1. Download the latest release from [Releases](https://github.com/railsblueprint/blueprint-mcp/releases)
-2. Unzip the extension
-3. Open `chrome://extensions/`
-4. Enable "Developer mode"
-5. Click "Load unpacked" and select the `extension` folder
+**Chrome**
+- Option A: [Chrome Web Store](https://chrome.google.com/webstore) - Coming Soon
+- Option B: Manual - Download from [Releases](https://github.com/railsblueprint/blueprint-mcp/releases), then load unpacked at `chrome://extensions/`
+
+**Firefox**
+- Option A: [Firefox Add-ons](https://addons.mozilla.org/) - Coming Soon
+- Option B: Manual - Download from [Releases](https://github.com/railsblueprint/blueprint-mcp/releases), then load at `about:debugging#/runtime/this-firefox`
+
+**Opera**
+- Manual Installation - Download from [Releases](https://github.com/railsblueprint/blueprint-mcp/releases), then load unpacked at `opera://extensions/`
 
 ### 3. Configure your MCP client
 
