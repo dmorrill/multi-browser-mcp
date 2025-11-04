@@ -1,3 +1,12 @@
+# v1.9.6 (2025-11-04)
+
+## Changes
+
+- Optimize extension builds: exclude logo source files and documentation
+- Fix critical Firefox packaging bug - add missing shared modules
+- Add Edge extension support to build system
+
+
 # v1.9.5 (2025-11-04)
 
 ## Changes
