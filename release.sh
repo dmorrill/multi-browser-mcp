@@ -176,8 +176,12 @@ npm run build > /dev/null 2>&1
 cd ../..
 echo "  ✅ Chrome extension built"
 
-# Firefox doesn't need build (vanilla JS)
-echo "  ✅ Firefox extension ready (no build needed - vanilla JS)"
+# Build Firefox extension (needs shared modules copied)
+echo "  → Building Firefox extension..."
+cd extensions
+node build-firefox.js > /dev/null 2>&1
+cd ..
+echo "  ✅ Firefox extension built"
 
 # Build Opera extension (uses Chrome source)
 echo "  → Building Opera extension..."
@@ -212,11 +216,12 @@ echo "  ✅ Chrome extension packaged: $CHROME_ZIP"
 # Package Firefox extension
 FIREFOX_ZIP="releases/firefox/blueprint-mcp-firefox-v$NEW_VERSION.zip"
 echo "  → Creating $FIREFOX_ZIP..."
-cd extensions/firefox
+cd dist/firefox
 zip -r ../../$FIREFOX_ZIP . -q \
   -x "*.git*" \
   -x "*node_modules*" \
-  -x "*.DS_Store"
+  -x "*.DS_Store" \
+  -x "build-info.json"
 cd ../..
 echo "  ✅ Firefox extension packaged: $FIREFOX_ZIP"
 
