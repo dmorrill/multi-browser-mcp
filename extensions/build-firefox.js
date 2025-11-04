@@ -31,7 +31,7 @@ console.log('✓ Created dist/firefox\n');
 // Copy firefox extension files
 console.log('📦 Copying Firefox extension files...');
 copyDirectory(firefoxSrc, distDir, {
-  exclude: ['shared', 'node_modules', 'package.json', 'package-lock.json', '.gitignore']
+  exclude: ['shared', 'node_modules', 'public', 'package.json', 'package-lock.json', '.env.example', '.gitignore']
 });
 console.log('✓ Firefox files copied\n');
 

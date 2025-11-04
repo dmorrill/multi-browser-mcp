@@ -58,6 +58,7 @@ copyDirectory(chromeSrc, safariResources, {
     'dist',
     'src',  // We'll copy specific src files
     'tests',
+    'public',  // Dev test files, not needed in production
     'package.json',
     'package-lock.json',
     'tsconfig.json',
@@ -65,6 +66,7 @@ copyDirectory(chromeSrc, safariResources, {
     'vite.config.mts',
     'vite.content.config.mts',
     'vite.sw.config.mts',
+    '.env.example',
     '.gitignore',
     'README.md'
   ]
