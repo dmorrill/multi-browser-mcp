@@ -201,7 +201,7 @@ export class WebSocketConnection {
       this.socket.onopen = () => this._handleOpen();
       this.socket.onmessage = (event) => this._handleMessage(event);
       this.socket.onerror = (error) => this._handleError(error);
-      this.socket.onclose = () => this._handleClose();
+      this.socket.onclose = (event) => this._handleClose(event);
 
     } catch (error) {
       this.logger.logAlways('[WebSocket] Connection error:', error);
@@ -544,8 +544,8 @@ export class WebSocketConnection {
   /**
    * Handle WebSocket close event
    */
-  _handleClose() {
-    this.logger.logAlways('Disconnected');
+  _handleClose(event) {
+    this.logger.logAlways(`Disconnected - Code: ${event?.code}, Reason: ${event?.reason || 'No reason provided'}, Clean: ${event?.wasClean}`);
     this.isConnected = false;
 
     // Stop periodic token refresh check
