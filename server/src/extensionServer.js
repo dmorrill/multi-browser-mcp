@@ -7,10 +7,12 @@
 
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const { getLogger } = require('./fileLogger');
 
 function debugLog(...args) {
   if (global.DEBUG_MODE) {
-    console.error('[ExtensionServer]', ...args);
+    const logger = getLogger();
+    logger.log('[ExtensionServer]', ...args);
   }
 }
 
@@ -27,6 +29,7 @@ class ExtensionServer {
     this._clientId = null; // MCP client_id to display in extension
     this._browserType = 'chrome'; // Browser type: 'chrome' or 'firefox'
     this._buildTimestamp = null; // Extension build timestamp
+    this._pingInterval = null; // Ping interval to keep connection alive
   }
 
   /**
@@ -64,9 +67,30 @@ class ExtensionServer {
       });
 
       this._wss.on('connection', (ws) => {
+        debugLog('Extension connection attempt');
+
+        // If we already have an active connection, reject the new one
+        if (this._extensionWs && this._extensionWs.readyState === 1) {
+          debugLog('Rejecting new connection - browser already connected');
+
+          // Send error message to the new connection
+          const errorMsg = {
+            jsonrpc: '2.0',
+            error: {
+              code: -32001,
+              message: 'Another browser is already connected. Only one browser can be connected at a time.'
+            }
+          };
+          ws.send(JSON.stringify(errorMsg));
+
+          // Close the new connection after a short delay to ensure message is sent
+          setTimeout(() => ws.close(1008, 'Already connected'), 100);
+          return;
+        }
+
         debugLog('Extension connected');
 
-        // Close previous connection if any
+        // Close previous connection if any (only if it's dead/closing)
         const isReconnection = !!this._extensionWs;
         if (this._extensionWs) {
           debugLog('Closing previous extension connection - RECONNECTION DETECTED');
@@ -74,6 +98,21 @@ class ExtensionServer {
         }
 
         this._extensionWs = ws;
+
+        // Clear old ping interval if any
+        if (this._pingInterval) {
+          clearInterval(this._pingInterval);
+          this._pingInterval = null;
+        }
+
+        // Start ping interval to keep connection alive (every 10 seconds)
+        // This prevents Chrome from suspending the service worker
+        this._pingInterval = setInterval(() => {
+          if (ws.readyState === 1) { // OPEN
+            ws.ping();
+            debugLog('Sent ping to extension');
+          }
+        }, 10000);
 
         // Notify about reconnection after setting the new connection
         if (isReconnection && this.onReconnect) {
@@ -85,10 +124,19 @@ class ExtensionServer {
           this._handleMessage(data);
         });
 
+        ws.on('pong', () => {
+          debugLog('Received pong from extension');
+        });
+
         ws.on('close', () => {
           debugLog('Extension disconnected');
           if (this._extensionWs === ws) {
             this._extensionWs = null;
+          }
+          // Clear ping interval when connection closes
+          if (this._pingInterval) {
+            clearInterval(this._pingInterval);
+            this._pingInterval = null;
           }
         });
 
