@@ -437,6 +437,17 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
     case 'Page.navigate': {
       const url = cdpParams.url;
 
+      // Check if trying to navigate to file:// URL without permission
+      if (url.startsWith('file://')) {
+        // Check if extension has file access permission
+        const extensionInfo = await chrome.management.getSelf();
+        if (!extensionInfo.hostPermissions.includes('file:///*') && !extensionInfo.hostPermissions.includes('<all_urls>')) {
+          throw new Error(
+            'Cannot navigate to file:// URLs. Please enable "Allow access to file URLs" in chrome://extensions/ for Blueprint MCP extension.'
+          );
+        }
+      }
+
       // Navigate the tab
       await chrome.tabs.update(attachedTabId, { url });
 
@@ -924,7 +935,7 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
         const params = {
           format: format,
           quality: format === 'jpeg' ? quality : undefined,
-          captureBeyondViewport: false
+          captureBeyondViewport: cdpParams.captureBeyondViewport || false
           // Note: fromSurface: false not allowed when using Debugger API
         };
 
