@@ -1,3 +1,10 @@
+# v1.9.9 (2025-11-09)
+
+## Changes
+
+- Fix full-page screenshots and improve file URL error handling (#20)
+
+
 # v1.9.8 (2025-11-08)
 
 ## Changes
