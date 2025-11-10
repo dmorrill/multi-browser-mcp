@@ -1,3 +1,11 @@
+# v1.9.11 (2025-11-10)
+
+## Changes
+
+- Fix release script to automatically copy README to server directory
+- Fix: Copy README to server directory for npm package
+
+
 # v1.9.10 (2025-11-10)
 
 ## Changes
