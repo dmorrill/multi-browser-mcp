@@ -15,6 +15,7 @@
   },
   "license": "Apache-2.0",
   "scripts": {
+    "postinstall": "node scripts/post-install.js",
     "docker-build": "docker build --no-cache -t blueprint-mcp-dev:latest ..",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -33,6 +34,12 @@
   "bin": {
     "blueprint-mcp": "cli.js"
   },
+  "files": [
+    "cli.js",
+    "src/",
+    "scripts/",
+    "../README.md"
+  ],
   "devDependencies": {
     "@types/node": "^24.3.0",
     "jest": "^30.2.0"
