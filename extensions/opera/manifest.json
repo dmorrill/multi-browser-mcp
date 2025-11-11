@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Blueprint MCP for Opera",
   "version": "1.9.11",
-  "description": "Share browser tabs with Blueprint MCP server",
+  "description": "Browser automation for Claude without token limits. Uses CSS selectors, not snapshots. Open source, zero telemetry.",
   "permissions": [
     "alarms",
     "debugger",
