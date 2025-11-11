@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Blueprint MCP for Edge",
   "version": "1.9.11",
-  "description": "Edge extension for Blueprint MCP - browser automation via Model Context Protocol",
+  "description": "Browser automation for Claude without token limits. Uses CSS selectors, not snapshots. Open source, zero telemetry.",
   "permissions": [
     "alarms",
     "debugger",
