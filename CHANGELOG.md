@@ -1,3 +1,11 @@
+# v1.9.12 (2025-11-11)
+
+## Changes
+
+- Update extension manifest descriptions (#23)
+- Document --port command line option (#22)
+
+
 # v1.9.11 (2025-11-10)
 
 ## Changes
