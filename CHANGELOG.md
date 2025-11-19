@@ -1,3 +1,10 @@
+# v1.9.14 (2025-11-19)
+
+## Changes
+
+- Fix screenshot failures from debugger detachment (#26)
+
+
 # v1.9.13 (2025-11-19)
 
 ## Changes
