@@ -345,6 +345,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Initialize WebSocket connection
 wsConnection = new WebSocketConnection(chrome, logger, iconManager, buildTimestamp);
 
+// Listen for debugger detach events to keep state in sync
+chrome.debugger.onDetach.addListener((source, reason) => {
+  logger.log(`[Background] Debugger detached from tab ${source.tabId}, reason: ${reason}`);
+
+  // Reset debugger state if it was detached from the current tab
+  if (source.tabId === currentDebuggerTabId) {
+    debuggerAttached = false;
+    currentDebuggerTabId = null;
+    logger.log('[Background] Debugger state reset');
+  }
+});
+
 // Helper function to ensure debugger is attached to current tab
 async function ensureDebuggerAttached() {
   const attachedTabId = tabHandlers.getAttachedTabId();
