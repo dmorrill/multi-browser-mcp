@@ -507,8 +507,10 @@ export class WebSocketConnection {
       throw new Error('Authentication failed: Token expired. Please login again.');
     }
 
-    // Always get browser name from manifest (most reliable)
-    const browserName = this._getBrowserName();
+    // Get custom browser name from storage, fallback to manifest name
+    const defaultBrowserName = this._getBrowserName();
+    const storedName = await this.browser.storage.local.get(['browserName']);
+    const browserName = storedName.browserName || defaultBrowserName;
 
     // Get or generate stable client_id
     let clientId = result.stableClientId;
