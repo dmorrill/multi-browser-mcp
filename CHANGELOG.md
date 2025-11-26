@@ -1,3 +1,13 @@
+# v1.9.15 (2025-11-26)
+
+## Changes
+
+- Fix Enter key not triggering form submission in textareas (#30)
+- Add i18n support to all browser extensions (#29)
+- Add welcome page on extension install (#28)
+- Fix selector-based screenshots capturing wrong area (#27)
+
+
 # v1.9.14 (2025-11-19)
 
 ## Changes
