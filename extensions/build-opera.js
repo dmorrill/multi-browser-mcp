@@ -27,7 +27,7 @@ if (fs.existsSync(distDir)) {
 fs.mkdirSync(distDir, { recursive: true });
 console.log('✓ Created dist/opera\n');
 
-// Copy Chrome extension files (excluding manifest.json - we'll use Opera's)
+// Copy Chrome extension files (excluding manifest.json and _locales - we'll use Opera's)
 console.log('📦 Copying Chrome extension files...');
 copyDirectory(chromeSrc, distDir, {
   exclude: [
@@ -48,7 +48,8 @@ copyDirectory(chromeSrc, distDir, {
     '.DS_Store',
     '.env.example',
     'README.md',
-    'manifest.json'  // Exclude Chrome manifest - we'll use Opera's
+    'manifest.json',  // Exclude Chrome manifest - we'll use Opera's
+    '_locales'  // Exclude Chrome locales - we'll use Opera's
   ],
   fileFilter: (filename) => {
     // Exclude logo source files (1.5MB total, not used in runtime)
@@ -80,6 +81,13 @@ fs.copyFileSync(
   path.join(distDir, 'manifest.json')
 );
 console.log('✓ Opera manifest copied\n');
+
+// Copy Opera-specific locales
+console.log('📦 Copying Opera locales...');
+const operaLocales = path.join(operaSrc, '_locales');
+const distLocales = path.join(distDir, '_locales');
+copyDirectory(operaLocales, distLocales);
+console.log('✓ Opera locales copied\n');
 
 // Copy shared modules
 console.log('📦 Copying shared modules...');

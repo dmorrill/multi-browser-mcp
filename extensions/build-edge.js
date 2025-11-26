@@ -27,7 +27,7 @@ if (fs.existsSync(distDir)) {
 fs.mkdirSync(distDir, { recursive: true });
 console.log('✓ Created dist/edge\n');
 
-// Copy Chrome extension files (excluding manifest.json - we'll use Edge's)
+// Copy Chrome extension files (excluding manifest.json and _locales - we'll use Edge's)
 console.log('📦 Copying Chrome extension files...');
 copyDirectory(chromeSrc, distDir, {
   exclude: [
@@ -48,7 +48,8 @@ copyDirectory(chromeSrc, distDir, {
     '.DS_Store',
     '.env.example',
     'README.md',
-    'manifest.json'  // Exclude Chrome manifest - we'll use Edge's
+    'manifest.json',  // Exclude Chrome manifest - we'll use Edge's
+    '_locales'  // Exclude Chrome locales - we'll use Edge's
   ],
   fileFilter: (filename) => {
     // Exclude logo source files (1.5MB total, not used in runtime)
@@ -80,6 +81,13 @@ fs.copyFileSync(
   path.join(distDir, 'manifest.json')
 );
 console.log('✓ Edge manifest copied\n');
+
+// Copy Edge-specific locales
+console.log('📦 Copying Edge locales...');
+const edgeLocales = path.join(edgeSrc, '_locales');
+const distLocales = path.join(distDir, '_locales');
+copyDirectory(edgeLocales, distLocales);
+console.log('✓ Edge locales copied\n');
 
 // Copy shared modules
 console.log('📦 Copying shared modules...');
