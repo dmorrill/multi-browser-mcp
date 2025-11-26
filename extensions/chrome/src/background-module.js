@@ -901,6 +901,7 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
           const bounds = evalResult.result.value;
 
           // Apply padding - use page coordinates for captureBeyondViewport
+          // scale: 1 captures at native resolution - downscaling handled server-side
           finalClip = {
             x: Math.max(0, bounds.pageX - padding),
             y: Math.max(0, bounds.pageY - padding),
@@ -925,21 +926,23 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
             );
             const scroll = scrollResult.result.value;
 
+            // scale: 1 captures at native resolution - downscaling handled server-side
             finalClip = {
               x: Number(clip.x) - scroll.x,
               y: Number(clip.y) - scroll.y,
               width: Number(clip.width),
               height: Number(clip.height),
-              scale: Number(clip.scale) || 1
+              scale: 1
             };
           } else {
             // Use viewport coordinates as-is
+            // scale: 1 captures at native resolution - downscaling handled server-side
             finalClip = {
               x: Number(clip.x) || 0,
               y: Number(clip.y) || 0,
               width: Number(clip.width),
               height: Number(clip.height),
-              scale: Number(clip.scale) || 1
+              scale: 1
             };
           }
         }

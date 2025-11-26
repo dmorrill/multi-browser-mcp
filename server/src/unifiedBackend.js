@@ -3362,12 +3362,13 @@ class UnifiedBackend {
     let dimensions = sizeOf(buffer);
 
     // Downscale if needed for 1:1 screenshots
-    // IMPORTANT: Only resize full viewport screenshots, not partial screenshots (selector/clip)
-    const isPartialScreenshot = args.selector || (args.clip_x !== undefined);
-    if (deviceScale > 0 && deviceScale < (viewport.devicePixelRatio || 1) && !args.fullPage && !isPartialScreenshot) {
+    // All scaling handled here - extension captures at native resolution
+    const dpr = viewport.devicePixelRatio || 1;
+    if (deviceScale > 0 && deviceScale < dpr && !args.fullPage) {
       const sharp = require('sharp');
-      const targetWidth = Math.round(viewport.width * deviceScale);
-      const targetHeight = Math.round(viewport.height * deviceScale);
+      const scaleFactor = deviceScale / dpr;
+      const targetWidth = Math.round(dimensions.width * scaleFactor);
+      const targetHeight = Math.round(dimensions.height * scaleFactor);
 
       buffer = await sharp(buffer)
         .resize(targetWidth, targetHeight, {
