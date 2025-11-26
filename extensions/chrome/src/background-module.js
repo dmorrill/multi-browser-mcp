@@ -16,10 +16,15 @@ import { DialogHandler } from '../../shared/handlers/dialogs.js';
 import { ConsoleHandler } from '../../shared/handlers/console.js';
 import { createBrowserAdapter } from '../../shared/adapters/browser.js';
 import { wrapWithUnwrap, shouldUnwrap } from '../../shared/utils/unwrap.js';
+import { setupInstallHandler } from '../../shared/handlers/install.js';
 
 // Initialize browser adapter at top level (before async IIFE)
 const browserAdapter = createBrowserAdapter();
 const chrome = browserAdapter.getRawAPI();
+
+// Set up welcome page to open on first install (must be at top level for MV3)
+// Browser name is auto-detected from manifest.json
+setupInstallHandler(chrome);
 
 // Top-level variables for tab monitoring
 let tabHandlers = null;

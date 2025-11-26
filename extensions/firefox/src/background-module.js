@@ -16,13 +16,18 @@ import { DialogHandler } from '../shared/handlers/dialogs.js';
 import { ConsoleHandler } from '../shared/handlers/console.js';
 import { createBrowserAdapter } from '../shared/adapters/browser.js';
 import { wrapWithUnwrap, shouldUnwrap } from '../shared/utils/unwrap.js';
+import { setupInstallHandler } from '../shared/handlers/install.js';
+
+// Initialize browser adapter at top level (before async IIFE) for install handler
+const browserAdapter = createBrowserAdapter();
+const browser = browserAdapter.getRawAPI();
+
+// Set up welcome page to open on first install (must be at top level)
+// Browser name is auto-detected from manifest.json
+setupInstallHandler(browser);
 
 // Main initialization
 (async () => {
-
-// Initialize browser adapter
-const browserAdapter = createBrowserAdapter();
-const browser = browserAdapter.getRawAPI();
 
 /**
  * Execute script helper - Manifest V3 compatible
