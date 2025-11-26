@@ -292,7 +292,7 @@ class UnifiedBackend {
             quality: { type: 'number', description: 'JPEG quality 0-100 (default: 80)' },
             path: { type: 'string', description: 'Optional: file path to save screenshot. If provided, saves to disk instead of returning image data.' },
             highlightClickables: { type: 'boolean', description: 'Highlight clickable elements with green border and background (default: false)' },
-            deviceScale: { type: 'number', description: 'Device scale factor for pixel-perfect screenshots (default: 1 for 1:1, use 0 for device native)' },
+            deviceScale: { type: 'number', description: 'Output scale factor: 1 for 1:1 CSS pixels (default), 0 for native device resolution (2x on retina). Works with all screenshot types.' },
             selector: { type: 'string', description: 'CSS selector to screenshot (partial screenshot by element). Red highlight shown automatically after capture.' },
             padding: { type: 'number', description: 'Padding in pixels around selector (default: 0)' },
             clip_x: { type: 'number', description: 'Clip X coordinate (for coordinate-based partial screenshot)' },
