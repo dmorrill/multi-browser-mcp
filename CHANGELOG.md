@@ -1,3 +1,10 @@
+# v1.9.18 (2025-12-08)
+
+## Changes
+
+- Force English 'for Firefox' in all locale extName fields
+
+
 # v1.9.17 (2025-12-08)
 
 ## Changes
