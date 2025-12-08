@@ -130,10 +130,14 @@ function copyLocalesWithBrowserName(src, dest, browserName) {
 
     if (fs.existsSync(messagesSrc)) {
       let content = fs.readFileSync(messagesSrc, 'utf8');
-      // For Firefox: use generic name to avoid trademark issues with "Firefox" in name
-      // Mozilla's linter rejects "X for Firefox" even though their policy allows it
+      // For Firefox: force English "for Firefox" in extName to pass Mozilla's server validation
+      // The server rejects localized versions like "für Firefox", "pour Firefox", "para Firefox"
+      // but accepts English "for Firefox" pattern
       if (browserName === 'Firefox') {
-        content = content.replace(/Blueprint MCP for Chrome/g, 'Blueprint MCP - Browser Automation');
+        // Replace any localized "Blueprint MCP <preposition> Chrome" with English "for Firefox"
+        // This regex matches: Blueprint MCP + any word(s) + Chrome in extName context
+        content = content.replace(/"message":\s*"Blueprint MCP [^"]*Chrome"/g, '"message": "Blueprint MCP for Firefox"');
+        // Then replace remaining Chrome references in descriptions
         content = content.replace(/Chrome/g, browserName);
       } else {
         // Replace "Chrome" with browser name (case-sensitive for proper branding)
