@@ -16,7 +16,8 @@
     "webRequest",
     "storage",
     "management",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>",
