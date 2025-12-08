@@ -1,3 +1,13 @@
+# v1.9.16 (2025-12-08)
+
+## Changes
+
+- Clean up extension locales to match Chrome Web Store supported list
+- Make :has-text() selector fully case-insensitive (#33)
+- Add keepalive alarm to Firefox extension to prevent service worker suspension (#32)
+- Add Chrome store banner 1280x800
+
+
 # v1.9.15 (2025-11-26)
 
 ## Changes
