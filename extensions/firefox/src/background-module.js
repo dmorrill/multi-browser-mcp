@@ -26,6 +26,17 @@ const browser = browserAdapter.getRawAPI();
 // Browser name is auto-detected from manifest.json
 setupInstallHandler(browser);
 
+// Set up keepalive alarm at TOP LEVEL (prevents service worker suspension in MV3)
+// This must be synchronous to ensure the listener is registered before service worker sleeps
+if (browser.alarms) {
+  browser.alarms.create('keepalive', { periodInMinutes: 1 });
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'keepalive') {
+      console.log('[Background] Keepalive alarm - service worker active');
+    }
+  });
+}
+
 // Main initialization
 (async () => {
 
