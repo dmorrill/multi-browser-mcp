@@ -130,8 +130,15 @@ function copyLocalesWithBrowserName(src, dest, browserName) {
 
     if (fs.existsSync(messagesSrc)) {
       let content = fs.readFileSync(messagesSrc, 'utf8');
-      // Replace "Chrome" with browser name (case-sensitive for proper branding)
-      content = content.replace(/Chrome/g, browserName);
+      // For Firefox: use generic name to avoid trademark issues with "Firefox" in name
+      // Mozilla's linter rejects "X for Firefox" even though their policy allows it
+      if (browserName === 'Firefox') {
+        content = content.replace(/Blueprint MCP for Chrome/g, 'Blueprint MCP - Browser Automation');
+        content = content.replace(/Chrome/g, browserName);
+      } else {
+        // Replace "Chrome" with browser name (case-sensitive for proper branding)
+        content = content.replace(/Chrome/g, browserName);
+      }
       fs.writeFileSync(messagesDest, content);
     }
   }
