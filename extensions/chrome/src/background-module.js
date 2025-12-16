@@ -528,6 +528,17 @@ async function handleCDPCommand(cdpMethod, cdpParams) {
           }
         );
 
+        // Forward exceptionDetails if present (JavaScript syntax/runtime errors)
+        if (result.exceptionDetails) {
+          return {
+            result: {
+              type: result.result?.type || 'undefined',
+              value: result.result?.value
+            },
+            exceptionDetails: result.exceptionDetails
+          };
+        }
+
         return {
           result: {
             type: result.result?.type || 'undefined',
