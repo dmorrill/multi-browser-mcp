@@ -3477,6 +3477,20 @@ class UnifiedBackend {
       }
     });
 
+    // Check for JavaScript errors (syntax errors, runtime errors, etc.)
+    if (result.exceptionDetails) {
+      const errorDesc = result.exceptionDetails.exception?.description ||
+                        result.exceptionDetails.text ||
+                        'JavaScript evaluation failed';
+      return {
+        content: [{
+          type: 'text',
+          text: `### JavaScript Error\n\`\`\`\n${errorDesc}\n\`\`\``
+        }],
+        isError: true
+      };
+    }
+
     return {
       content: [{
         type: 'text',
