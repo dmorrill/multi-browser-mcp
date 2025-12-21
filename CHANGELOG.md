@@ -1,3 +1,10 @@
+# v1.9.20 (2025-12-21)
+
+## Changes
+
+- Add script mode for non-MCP scripting (PRO feature) (#37)
+
+
 # v1.9.19 (2025-12-17)
 
 ## Changes
