@@ -32,6 +32,7 @@ const { PassThrough } = require('stream');
 const { getLogger } = require('./src/fileLogger');
 
 const packageJSON = require('./package.json');
+const { startScriptMode } = require('./src/scriptMode');
 
 // Simple config resolver
 function resolveConfig(options) {
@@ -231,7 +232,15 @@ program
   .option('--log-file <path>', 'Custom log file path (default: logs/mcp-debug.log)')
   .option('--port <number>', 'WebSocket server port (default: 5555)', parseInt)
   .option('--child', 'Internal flag: indicates this is a child process spawned by wrapper')
+  .option('--script-mode', 'Enable scripting mode (JSON-RPC over stdio for automation scripts)')
   .action(async (options) => {
+    // Script mode: JSON-RPC over stdio for automation scripts
+    if (options.scriptMode) {
+      const config = resolveConfig(options);
+      await startScriptMode(config);
+      return;
+    }
+
     // If --debug and NOT --child: run as wrapper (parent process)
     if (options.debug && !options.child) {
       runAsWrapper();

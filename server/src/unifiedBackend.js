@@ -562,8 +562,11 @@ class UnifiedBackend {
 
   /**
    * Call a tool
+   * @param {string} name - Tool name
+   * @param {object} args - Tool arguments
+   * @param {object} options - Options (rawResult: true for structured JSON output)
    */
-  async callTool(name, args) {
+  async callTool(name, args, options = {}) {
     debugLog(`callTool: ${name}`, args);
 
     try {
@@ -617,102 +620,107 @@ class UnifiedBackend {
 
       let result;
 
-      // Route to appropriate handler
+      // Route to appropriate handler (pass options for rawResult support)
       switch (name) {
         case 'browser_tabs':
-          result = await this._handleBrowserTabs(args);
+          result = await this._handleBrowserTabs(args, options);
           break;
 
         case 'browser_navigate':
-          result = await this._handleNavigate(args);
+          result = await this._handleNavigate(args, options);
           break;
 
         case 'browser_interact':
-          result = await this._handleInteract(args);
+          result = await this._handleInteract(args, options);
           break;
 
         case 'browser_snapshot':
-          result = await this._handleSnapshot();
+          result = await this._handleSnapshot(options);
           break;
 
         case 'browser_take_screenshot':
-          result = await this._handleScreenshot(args);
+          result = await this._handleScreenshot(args, options);
           break;
 
         case 'browser_evaluate':
-          result = await this._handleEvaluate(args);
+          result = await this._handleEvaluate(args, options);
           break;
 
         case 'browser_console_messages':
-          result = await this._handleConsoleMessages(args);
+          result = await this._handleConsoleMessages(args, options);
           break;
 
         // Forms
         case 'browser_fill_form':
-          result = await this._handleFillForm(args);
+          result = await this._handleFillForm(args, options);
           break;
 
         // Mouse
         case 'browser_drag':
-          result = await this._handleDrag(args);
+          result = await this._handleDrag(args, options);
           break;
 
         // Window
         case 'browser_window':
-          result = await this._handleWindow(args);
+          result = await this._handleWindow(args, options);
           break;
 
         // Verification
         case 'browser_verify_text_visible':
-          result = await this._handleVerifyTextVisible(args);
+          result = await this._handleVerifyTextVisible(args, options);
           break;
 
         case 'browser_verify_element_visible':
-          result = await this._handleVerifyElementVisible(args);
+          result = await this._handleVerifyElementVisible(args, options);
           break;
 
         // Network
         case 'browser_network_requests':
-          result = await this._handleNetworkRequests(args);
+          result = await this._handleNetworkRequests(args, options);
           break;
 
         // PDF
         case 'browser_pdf_save':
-          result = await this._handlePdfSave(args);
+          result = await this._handlePdfSave(args, options);
           break;
 
         // Dialogs
         case 'browser_handle_dialog':
-          result = await this._handleDialog(args);
+          result = await this._handleDialog(args, options);
           break;
 
         // Extension management
         case 'browser_list_extensions':
-          result = await this._handleListExtensions();
+          result = await this._handleListExtensions(options);
           break;
 
         case 'browser_reload_extensions':
-          result = await this._handleReloadExtensions(args);
+          result = await this._handleReloadExtensions(args, options);
           break;
 
         case 'browser_performance_metrics':
-          result = await this._handlePerformanceMetrics(args);
+          result = await this._handlePerformanceMetrics(args, options);
           break;
 
         case 'browser_extract_content':
-          result = await this._handleExtractContent(args);
+          result = await this._handleExtractContent(args, options);
           break;
 
         case 'browser_lookup':
-          result = await this._handleLookup(args);
+          result = await this._handleLookup(args, options);
           break;
 
         case 'browser_get_element_styles':
-          result = await this._handleGetElementStyles(args);
+          result = await this._handleGetElementStyles(args, options);
           break;
 
         default:
           throw new Error(`Tool '${name}' not implemented yet`);
+      }
+
+      // For rawResult mode, return result directly without status header
+      if (options.rawResult) {
+        return result;
       }
 
       // Add status header to all browser tool responses
@@ -775,12 +783,29 @@ class UnifiedBackend {
 
   // ==================== TOOL HANDLERS ====================
 
-  async _handleBrowserTabs(args) {
+  async _handleBrowserTabs(args, options = {}) {
     const action = args.action;
 
     if (action === 'list') {
       const result = await this._transport.sendCommand('getTabs', {});
       const tabs = result.tabs || [];
+
+      // For rawResult, return structured data
+      if (options.rawResult) {
+        return {
+          tabs: tabs.map(tab => ({
+            index: tab.index,
+            id: tab.id,
+            title: tab.title || 'Untitled',
+            url: tab.url || 'about:blank',
+            active: tab.active || false,
+            automatable: tab.automatable !== false,
+            windowId: tab.windowId
+          })),
+          focusedWindowId: result.focusedWindowId,
+          totalTabs: tabs.length
+        };
+      }
 
       // Group tabs by window
       const tabsByWindow = {};
@@ -845,6 +870,21 @@ class UnifiedBackend {
         this._statefulBackend._stealthMode = args.stealth || false;
       }
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'new',
+          tab: {
+            id: result.tab?.id,
+            index: tabIndex,
+            title: result.tab?.title || newTab?.title,
+            url: args.url || 'about:blank'
+          },
+          attached: true,
+          stealth: args.stealth || false
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -873,6 +913,19 @@ class UnifiedBackend {
         this._statefulBackend._stealthMode = args.stealth || false;
       }
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'attach',
+          tab: {
+            id: result.tab?.id,
+            index: args.index,
+            title: result.tab?.title,
+            url: result.tab?.url
+          },
+          stealth: args.stealth || false
+        };
+      }
 
       return {
         content: [{
@@ -895,6 +948,15 @@ class UnifiedBackend {
         this._statefulBackend._stealthMode = null;
       }
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'close',
+          closedIndex: args.index,
+          closedAttachedTab: result.closedAttachedTab || false
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -907,7 +969,7 @@ class UnifiedBackend {
     throw new Error(`Unknown browser_tabs action: ${action}`);
   }
 
-  async _handleNavigate(args) {
+  async _handleNavigate(args, options = {}) {
     const action = args.action;
 
     if (action === 'url') {
@@ -930,6 +992,15 @@ class UnifiedBackend {
         };
       }
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'url',
+          url: result.url || args.url,
+          title: result.title,
+          techStack: result.techStack
+        };
+      }
 
       // Use detailed message from extension if available
       const message = result?.message || `Navigated to: ${args.url}`;
@@ -1486,7 +1557,7 @@ class UnifiedBackend {
     }
   }
 
-  async _handleInteract(args) {
+  async _handleInteract(args, options = {}) {
     const actions = args.actions || [];
     const onError = args.onError || 'stop';
     const results = [];
@@ -2746,6 +2817,20 @@ class UnifiedBackend {
       // Dialog event retrieval not supported or failed - ignore silently
     }
 
+    // For rawResult, return structured data
+    if (options.rawResult) {
+      return {
+        success: errorCount === 0,
+        total: results.length,
+        succeeded: successCount,
+        failed: errorCount,
+        results,
+        newTabs: newTabs || [],
+        iframeChanges: iframeChanges || null,
+        dialogDetected: dialogWarning ? true : false
+      };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -2936,7 +3021,7 @@ class UnifiedBackend {
     };
   }
 
-  async _handleSnapshot() {
+  async _handleSnapshot(options = {}) {
     // Get formatted accessibility tree snapshot from extension
     // Extension now does the heavy processing (grouping, collapsing, truncating)
     // and sends us a structured, compact JSON (~100KB instead of ~12MB)
@@ -2947,6 +3032,9 @@ class UnifiedBackend {
 
     // Extension returns { formattedSnapshot: { nodes, totalLines, truncated } }
     if (!result.formattedSnapshot) {
+      if (options.rawResult) {
+        return { success: false, error: 'no_snapshot', message: 'No formatted snapshot received from extension' };
+      }
       return {
         content: [{
           type: 'text',
@@ -2971,6 +3059,17 @@ class UnifiedBackend {
       debugLog(`Received formatted snapshot: ${formatted.totalLines} lines, truncated: ${formatted.truncated}`);
       snapshot = this._formatStructuredSnapshot(formatted.nodes);
       truncationMessage = formatted.truncated ? `\n\n--- ${formatted.truncationMessage} ---` : '';
+    }
+
+    // For rawResult, return structured data
+    if (options.rawResult) {
+      return {
+        success: true,
+        snapshot,
+        totalLines: formatted.totalLines,
+        truncated: formatted.truncated || false,
+        truncationMessage: formatted.truncationMessage
+      };
     }
 
     return {
@@ -3214,7 +3313,7 @@ class UnifiedBackend {
     return output;
   }
 
-  async _handleScreenshot(args) {
+  async _handleScreenshot(args, options = {}) {
     const format = args.type || 'jpeg';  // Default to JPEG for smaller file size
     const quality = args.quality !== undefined ? args.quality : 80;  // Default quality 80
     const highlightClickables = args.highlightClickables || false;  // Optional: highlight clickable elements
@@ -3421,6 +3520,21 @@ class UnifiedBackend {
         ? `\n\n⚠️ **Important:** When clicking coordinates, use viewport coordinates (${viewport.width}x${viewport.height}), NOT screenshot pixels (${dimensions.width}x${dimensions.height})!`
         : '';
 
+      // For rawResult, return structured data
+      if (options.rawResult) {
+        return {
+          success: true,
+          path: args.path,
+          format,
+          width: dimensions.width,
+          height: dimensions.height,
+          viewport: { width: viewport.width, height: viewport.height },
+          scale: actualScale,
+          sizeKB: parseFloat(sizeKB.toFixed(2)),
+          fullPage: args.fullPage || false
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -3448,6 +3562,21 @@ class UnifiedBackend {
 
     // Return base64 image if no path provided and dimensions are acceptable
     // Use the processed buffer (not original result.data) in case it was downscaled
+
+    // For rawResult, return structured data with base64
+    if (options.rawResult) {
+      return {
+        success: true,
+        format,
+        width: dimensions.width,
+        height: dimensions.height,
+        viewport: { width: viewport.width, height: viewport.height },
+        sizeKB: parseFloat(sizeKB.toFixed(2)),
+        data: buffer.toString('base64'),
+        mimeType: `image/${format}`
+      };
+    }
+
     return {
       content: [{
         type: 'image',
@@ -3458,7 +3587,7 @@ class UnifiedBackend {
     };
   }
 
-  async _handleEvaluate(args) {
+  async _handleEvaluate(args, options = {}) {
     const expression = args.function || args.expression;
 
     // If expression looks like a function definition, wrap and call it
@@ -3482,6 +3611,11 @@ class UnifiedBackend {
       const errorDesc = result.exceptionDetails.exception?.description ||
                         result.exceptionDetails.text ||
                         'JavaScript evaluation failed';
+
+      if (options.rawResult) {
+        return { success: false, error: 'js_error', message: errorDesc };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -3491,21 +3625,31 @@ class UnifiedBackend {
       };
     }
 
+    const value = result.result?.value;
+
+    // For rawResult mode, return the value directly
+    if (options.rawResult) {
+      return { success: true, value };
+    }
+
     return {
       content: [{
         type: 'text',
-        text: `### Result\n${JSON.stringify(result.result?.value, null, 2)}`
+        text: `### Result\n${JSON.stringify(value, null, 2)}`
       }],
       isError: false
     };
   }
 
-  async _handleConsoleMessages(args = {}) {
+  async _handleConsoleMessages(args = {}, options = {}) {
     const result = await this._transport.sendCommand('getConsoleMessages');
     let allMessages = result.messages || [];
     const totalBeforeFilter = allMessages.length;
 
     if (totalBeforeFilter === 0) {
+      if (options.rawResult) {
+        return { success: true, total: 0, filtered: 0, messages: [] };
+      }
       return {
         content: [{
           type: 'text',
@@ -3540,6 +3684,15 @@ class UnifiedBackend {
     const filteredCount = allMessages.length;
 
     if (filteredCount === 0) {
+      if (options.rawResult) {
+        return {
+          success: true,
+          total: totalBeforeFilter,
+          filtered: 0,
+          filters: { level: args.level, text: args.text, url: args.url },
+          messages: []
+        };
+      }
       let text = `### Console Messages\n\n`;
       text += `**Total:** ${totalBeforeFilter} message(s)\n`;
       text += `**Filtered:** 0 messages match the filters\n\n`;
@@ -3591,6 +3744,20 @@ class UnifiedBackend {
     }
     text += `\n${messageText}`;
 
+    if (options.rawResult) {
+      return {
+        success: true,
+        total: totalBeforeFilter,
+        filtered: filteredCount,
+        filters: { level: args.level, text: args.text, url: args.url },
+        showing: messages.length,
+        offset,
+        limit,
+        hasMore,
+        messages
+      };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -3602,7 +3769,7 @@ class UnifiedBackend {
 
   // ==================== FORMS ====================
 
-  async _handleFillForm(args) {
+  async _handleFillForm(args, options = {}) {
     for (const field of args.fields) {
       await this._transport.sendCommand('forwardCDPCommand', {
         method: 'Runtime.evaluate',
@@ -3630,6 +3797,10 @@ class UnifiedBackend {
           returnByValue: true
         }
       });
+    }
+
+    if (options.rawResult) {
+      return { success: true, filledCount: args.fields.length };
     }
 
     return {
@@ -3747,7 +3918,7 @@ class UnifiedBackend {
     };
   }
 
-  async _handleDrag(args) {
+  async _handleDrag(args, options = {}) {
     // Get source position
     const fromResult = await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Runtime.evaluate',
@@ -3803,6 +3974,16 @@ class UnifiedBackend {
       params: { type: 'mouseReleased', x: to.x, y: to.y, button: 'left' }
     });
 
+    if (options.rawResult) {
+      return {
+        success: true,
+        fromSelector: args.fromSelector,
+        toSelector: args.toSelector,
+        from: { x: from.x, y: from.y },
+        to: { x: to.x, y: to.y }
+      };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -3814,7 +3995,7 @@ class UnifiedBackend {
 
   // ==================== WINDOW ====================
 
-  async _handleWindow(args) {
+  async _handleWindow(args, options = {}) {
     const action = args.action;
 
     if (action === 'resize') {
@@ -3832,6 +4013,10 @@ class UnifiedBackend {
         }
       });
 
+      if (options.rawResult) {
+        return { success: true, action: 'resize', width: args.width, height: args.height };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -3844,6 +4029,10 @@ class UnifiedBackend {
     if (action === 'close') {
       // Close tab via extension command
       await this._transport.sendCommand('closeTab', {});
+
+      if (options.rawResult) {
+        return { success: true, action: 'close' };
+      }
 
       return {
         content: [{
@@ -3862,6 +4051,10 @@ class UnifiedBackend {
           expression: 'window.minimize ? window.minimize() : null'
         }
       });
+
+      if (options.rawResult) {
+        return { success: true, action: 'minimize' };
+      }
 
       return {
         content: [{
@@ -3894,6 +4087,10 @@ class UnifiedBackend {
           });
         }
       });
+
+      if (options.rawResult) {
+        return { success: true, action: 'maximize' };
+      }
 
       return {
         content: [{
@@ -3946,7 +4143,7 @@ class UnifiedBackend {
 
   // ==================== VERIFICATION ====================
 
-  async _handleVerifyTextVisible(args) {
+  async _handleVerifyTextVisible(args, options = {}) {
     const result = await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Runtime.evaluate',
       params: {
@@ -3956,6 +4153,10 @@ class UnifiedBackend {
     });
 
     const found = result.result?.value;
+
+    if (options.rawResult) {
+      return { success: true, visible: !!found, text: args.text };
+    }
 
     return {
       content: [{
@@ -3968,7 +4169,7 @@ class UnifiedBackend {
     };
   }
 
-  async _handleVerifyElementVisible(args) {
+  async _handleVerifyElementVisible(args, options = {}) {
     const result = await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Runtime.evaluate',
       params: {
@@ -3986,6 +4187,10 @@ class UnifiedBackend {
 
     const visible = result.result?.value;
 
+    if (options.rawResult) {
+      return { success: true, visible: !!visible, selector: args.selector };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -3999,12 +4204,15 @@ class UnifiedBackend {
 
   // ==================== NETWORK ====================
 
-  async _handleNetworkRequests(args = {}) {
+  async _handleNetworkRequests(args = {}, options = {}) {
     const action = args.action || 'list';
 
     // Action: clear
     if (action === 'clear') {
       await this._transport.sendCommand('clearTracking');
+      if (options.rawResult) {
+        return { success: true, action: 'clear' };
+      }
       return {
         content: [{
           type: 'text',
@@ -4019,6 +4227,9 @@ class UnifiedBackend {
     const requests = result.requests || [];
 
     if (requests.length === 0) {
+      if (options.rawResult) {
+        return { success: true, action, total: 0, requests: [] };
+      }
       return {
         content: [{
           type: 'text',
@@ -4062,6 +4273,16 @@ class UnifiedBackend {
       const paginatedRequests = filteredRequests.slice(offset, offset + limit);
 
       if (paginatedRequests.length === 0) {
+        if (options.rawResult) {
+          return {
+            success: true,
+            action: 'list',
+            total: requests.length,
+            filtered: 0,
+            filters: { urlPattern: args.urlPattern, method: args.method, status: args.status, resourceType: args.resourceType },
+            requests: []
+          };
+        }
         return {
           content: [{
             type: 'text',
@@ -4092,6 +4313,20 @@ class UnifiedBackend {
       const paginationInfo = totalFiltered > limit
         ? `\n**Showing:** ${offset + 1}-${offset + paginatedRequests.length} of ${totalFiltered}${hasMore ? ` (use \`offset=${offset + limit}\` for next page)` : ''}`
         : '';
+
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'list',
+          total: requests.length,
+          filtered: totalFiltered,
+          filters: { urlPattern: args.urlPattern, method: args.method, status: args.status, resourceType: args.resourceType },
+          offset,
+          limit,
+          hasMore,
+          requests: paginatedRequests
+        };
+      }
 
       return {
         content: [{
@@ -4253,6 +4488,14 @@ class UnifiedBackend {
         }
       }
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'details',
+          request: req
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -4387,6 +4630,21 @@ This request was captured by the browser extension's background tracker (webRequ
 
         if (evalResult.result && evalResult.result.value) {
           const replay = evalResult.result.value;
+
+          if (options.rawResult) {
+            return {
+              success: true,
+              action: 'replay',
+              request: { url: req.url, method: req.method },
+              response: {
+                status: replay.status,
+                statusText: replay.statusText,
+                headers: replay.headers,
+                body: replay.body
+              }
+            };
+          }
+
           let resultText = `### Request Replayed\n\n**${req.method} ${req.url}**\n\n**Response:**\nStatus: ${replay.status || 'unknown'} ${replay.statusText || ''}`;
 
           // Try to parse body as JSON
@@ -4436,7 +4694,7 @@ This request was captured by the browser extension's background tracker (webRequ
 
   // ==================== PDF ====================
 
-  async _handlePdfSave(args) {
+  async _handlePdfSave(args, options = {}) {
     const result = await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Page.printToPDF',
       params: {}
@@ -4448,6 +4706,15 @@ This request was captured by the browser extension's background tracker (webRequ
       const buffer = Buffer.from(result.data, 'base64');
       fs.writeFileSync(args.path, buffer);
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          path: args.path,
+          sizeBytes: buffer.length,
+          sizeKB: parseFloat((buffer.length / 1024).toFixed(2))
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -4458,6 +4725,14 @@ This request was captured by the browser extension's background tracker (webRequ
     }
 
     // If no path provided, return base64 data
+    if (options.rawResult) {
+      return {
+        success: true,
+        data: result.data,
+        dataLength: result.data?.length || 0
+      };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -4469,7 +4744,7 @@ This request was captured by the browser extension's background tracker (webRequ
 
   // ==================== DIALOGS ====================
 
-  async _handleDialog(args) {
+  async _handleDialog(args, options = {}) {
     await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Page.handleJavaScriptDialog',
       params: {
@@ -4477,6 +4752,10 @@ This request was captured by the browser extension's background tracker (webRequ
         promptText: args.text
       }
     });
+
+    if (options.rawResult) {
+      return { success: true, accepted: args.accept !== false };
+    }
 
     return {
       content: [{
@@ -4489,8 +4768,16 @@ This request was captured by the browser extension's background tracker (webRequ
 
   // ==================== EXTENSION MANAGEMENT ====================
 
-  async _handleListExtensions() {
+  async _handleListExtensions(options = {}) {
     const result = await this._transport.sendCommand('listExtensions', {});
+
+    if (options.rawResult) {
+      return {
+        success: true,
+        count: result.count || 0,
+        extensions: result.extensions || []
+      };
+    }
 
     const extList = (result.extensions || [])
       .map(ext => `- ${ext.name} (v${ext.version}) ${ext.enabled ? '[enabled]' : '[disabled]'}`)
@@ -4505,7 +4792,7 @@ This request was captured by the browser extension's background tracker (webRequ
     };
   }
 
-  async _handleReloadExtensions(args) {
+  async _handleReloadExtensions(args, options = {}) {
     const result = await this._transport.sendCommand('reloadExtensions', {
       extensionName: args.extensionName
     });
@@ -4514,6 +4801,15 @@ This request was captured by the browser extension's background tracker (webRequ
     const skippedPacked = result.skippedPacked || [];
     const count = reloadedList.length;
     const names = reloadedList.join(', ') || 'None';
+
+    if (options.rawResult) {
+      return {
+        success: true,
+        reloadedCount: count,
+        reloaded: reloadedList,
+        skippedPacked: skippedPacked
+      };
+    }
 
     let text = `### Extensions Reloaded\n\n**Count:** ${count}\n**Extensions:** ${names}`;
 
@@ -4534,7 +4830,7 @@ This request was captured by the browser extension's background tracker (webRequ
 
   // ==================== PERFORMANCE METRICS ====================
 
-  async _handlePerformanceMetrics(args) {
+  async _handlePerformanceMetrics(args, options = {}) {
     // Get current page URL
     const pageInfo = await this._transport.sendCommand('forwardCDPCommand', {
       method: 'Target.getTargetInfo',
@@ -4627,6 +4923,30 @@ This request was captured by the browser extension's background tracker (webRequ
       const lcpEmoji = evalMetric(timing.lcp, 2500, 4000);
       const clsEmoji = timing.cls <= 0.1 ? '🟢' : timing.cls <= 0.25 ? '🟡' : '🔴';
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          url,
+          webVitals: {
+            fcp: timing.fcp,
+            lcp: timing.lcp,
+            cls: timing.cls
+          },
+          loadTiming: {
+            ttfb: timing.ttfb,
+            domContentLoaded: timing.domContentLoaded,
+            domInteractive: timing.domInteractive,
+            loadComplete: timing.loadComplete
+          },
+          network: {
+            dnsTime: timing.dnsTime,
+            tcpTime: timing.tcpTime,
+            transferSize: timing.transferSize,
+            encodedBodySize: timing.encodedBodySize
+          }
+        };
+      }
+
       const metricsText = `### Performance Metrics
 
 **URL:** ${url}
@@ -4666,7 +4986,7 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
     }
   }
 
-  async _handleExtractContent(args) {
+  async _handleExtractContent(args, options = {}) {
     const mode = args.mode || 'auto';
     const selector = args.selector;
     const maxLines = args.max_lines || 250;
@@ -4913,6 +5233,20 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       infoText += `\n---\n\n`;
       infoText += chunk;
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          mode: data.mode,
+          detectedSelector: data.detectedSelector,
+          totalLines,
+          startLine: startLine + 1,
+          endLine,
+          linesShown: endLine - startLine,
+          truncated,
+          content: chunk
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -4929,7 +5263,7 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
   /**
    * Lookup elements by text content
    */
-  async _handleLookup(args) {
+  async _handleLookup(args, options = {}) {
     const searchText = args.text;
     const limit = args.limit || 10;
 
@@ -5017,6 +5351,16 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       const matches = data.matches || [];
       const totalCount = data.totalCount || 0;
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          searchText,
+          totalCount,
+          showing: matches.length,
+          matches
+        };
+      }
+
       if (matches.length === 0) {
         return {
           content: [{
@@ -5059,7 +5403,7 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
   /**
    * Get CSS styles for an element
    */
-  async _handleGetElementStyles(args) {
+  async _handleGetElementStyles(args, options = {}) {
     const selector = args.selector;
     const propertyFilter = args.property ? args.property.toLowerCase() : null;
 
@@ -5265,6 +5609,16 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       }
 
       if (propertyMap.size === 0) {
+        if (options.rawResult) {
+          return {
+            success: true,
+            selector,
+            propertyFilter: propertyFilter || null,
+            pseudoState: pseudoState.length > 0 ? pseudoState : null,
+            propertyCount: 0,
+            properties: {}
+          };
+        }
         if (propertyFilter) {
           output += `No CSS property \`${propertyFilter}\` found for this element.\n`;
         } else {
@@ -5286,6 +5640,22 @@ ${clsEmoji} Cumulative Layout Shift (CLS): ${timing.cls?.toFixed(3) || 'N/A'}
       const sortedProperties = Array.from(propertyMap.entries()).sort((a, b) =>
         a[0].localeCompare(b[0])
       );
+
+      if (options.rawResult) {
+        // Convert propertyMap to plain object for JSON serialization
+        const properties = {};
+        sortedProperties.forEach(([propName, values]) => {
+          properties[propName] = values;
+        });
+        return {
+          success: true,
+          selector,
+          propertyFilter: propertyFilter || null,
+          pseudoState: pseudoState.length > 0 ? pseudoState : null,
+          propertyCount: propertyMap.size,
+          properties
+        };
+      }
 
       sortedProperties.forEach(([propName, values]) => {
         output += `\n${propName}:\n`;
