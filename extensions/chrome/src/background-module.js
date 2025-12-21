@@ -162,8 +162,11 @@ networkTracker.init();
 // State variables
 let techStackInfo = {}; // Stores detected tech stack per tab
 // let pendingDialogResponse = null; // Stores response for next dialog (unused - removed)
-let debuggerAttached = false; // Track if debugger is attached to current tab
-let currentDebuggerTabId = null; // Track which tab has debugger attached
+
+// Multi-tab debugger support: Track all tabs with debugger attached
+// This allows multiple MCP clients to use different tabs simultaneously
+const attachedDebuggerTabs = new Set(); // Set of tabIds with debugger attached
+let currentDebuggerTabId = null; // Track current tab for Network/Runtime events routing
 
 // CDP Network tracking storage
 const cdpNetworkRequests = new Map(); // Stores CDP network requests by requestId
@@ -184,8 +187,8 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   // Only track Network and Runtime events
   if (!method.startsWith('Network.') && !method.startsWith('Runtime.')) return;
 
-  // Only track events for the currently attached tab
-  if (!currentDebuggerTabId || source.tabId !== currentDebuggerTabId) return;
+  // Only track events for tabs with debugger attached
+  if (!attachedDebuggerTabs.has(source.tabId)) return;
 
   try {
     switch (method) {
@@ -354,15 +357,19 @@ wsConnection = new WebSocketConnection(chrome, logger, iconManager, buildTimesta
 chrome.debugger.onDetach.addListener((source, reason) => {
   logger.log(`[Background] Debugger detached from tab ${source.tabId}, reason: ${reason}`);
 
-  // Reset debugger state if it was detached from the current tab
+  // Remove from attached tabs set
+  attachedDebuggerTabs.delete(source.tabId);
+  logger.log(`[Background] Removed tab ${source.tabId} from attached debugger tabs (${attachedDebuggerTabs.size} remaining)`);
+
+  // Reset current tab if it was detached
   if (source.tabId === currentDebuggerTabId) {
-    debuggerAttached = false;
     currentDebuggerTabId = null;
-    logger.log('[Background] Debugger state reset');
+    logger.log('[Background] Current debugger tab reset');
   }
 });
 
 // Helper function to ensure debugger is attached to current tab
+// Multi-tab support: keeps debuggers attached to all used tabs, doesn't detach from others
 async function ensureDebuggerAttached() {
   const attachedTabId = tabHandlers.getAttachedTabId();
 
@@ -370,27 +377,24 @@ async function ensureDebuggerAttached() {
     throw new Error('No tab attached');
   }
 
+  // Update current tab for routing Network/Runtime events
+  currentDebuggerTabId = attachedTabId;
+
   // If debugger is already attached to this tab, we're good
-  if (debuggerAttached && currentDebuggerTabId === attachedTabId) {
+  if (attachedDebuggerTabs.has(attachedTabId)) {
+    logger.log(`[Background] Debugger already attached to tab ${attachedTabId}`);
     return;
   }
 
-  // Detach from previous tab if needed
-  if (debuggerAttached && currentDebuggerTabId) {
-    try {
-      await chrome.debugger.detach({ tabId: currentDebuggerTabId });
-      logger.log(`[Background] Detached debugger from tab ${currentDebuggerTabId}`);
-    } catch (e) {
-      logger.log(`[Background] Failed to detach debugger: ${e.message}`);
-    }
-  }
+  // NOTE: We intentionally do NOT detach from other tabs
+  // This allows multiple MCP clients to use different tabs simultaneously
+  // The old detach logic has been removed to enable multi-tab support
 
-  // Attach to new tab
+  // Attach to new tab (keeping existing attachments)
   try {
     await chrome.debugger.attach({ tabId: attachedTabId }, '1.3');
-    debuggerAttached = true;
-    currentDebuggerTabId = attachedTabId;
-    logger.log(`[Background] Attached debugger to tab ${attachedTabId}`);
+    attachedDebuggerTabs.add(attachedTabId);
+    logger.log(`[Background] Attached debugger to tab ${attachedTabId} (${attachedDebuggerTabs.size} total tabs)`);
 
     // Enable Network domain for CDP network tracking
     try {
@@ -416,8 +420,7 @@ async function ensureDebuggerAttached() {
       logger.log(`[Background] Warning: Could not enable Runtime domain: ${runtimeError.message}`);
     }
   } catch (error) {
-    debuggerAttached = false;
-    currentDebuggerTabId = null;
+    // Don't add to set if attach failed
     throw new Error(`Failed to attach debugger: ${error.message}`);
   }
 }
