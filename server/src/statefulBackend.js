@@ -14,6 +14,9 @@ const { MCPConnection } = require('./mcpConnection');
 const { UnifiedBackend } = require('./unifiedBackend');
 const { ExtensionServer } = require('./extensionServer');
 const { DirectTransport, ProxyTransport } = require('./transport');
+const wrappers = require('./wrappers');
+const fs = require('fs');
+const path = require('path');
 
 // Helper function for debug logging
 function debugLog(...args) {
@@ -286,6 +289,36 @@ class StatefulBackend {
           destructiveHint: false,
           openWorldHint: false
         }
+      },
+      {
+        name: 'scripting',
+        description: 'Automate repetitive browser tasks with external scripts. Use when page structure and selectors are already known. Scripts run independently without LLM involvement. Get instructions or install a wrapper for Python, JavaScript, or Ruby.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: ['instructions', 'install_wrapper'],
+              description: 'Action: instructions (show usage guide) or install_wrapper (save wrapper file to disk)'
+            },
+            language: {
+              type: 'string',
+              enum: ['python', 'javascript', 'ruby'],
+              description: 'Wrapper language (required for install_wrapper)'
+            },
+            path: {
+              type: 'string',
+              description: 'File path to save the wrapper (required for install_wrapper)'
+            }
+          },
+          required: ['action']
+        },
+        annotations: {
+          title: 'Scripting automation',
+          readOnlyHint: false,
+          destructiveHint: false,
+          openWorldHint: false
+        }
       }
     ];
 
@@ -314,35 +347,45 @@ class StatefulBackend {
     return [...connectionTools, ...browserTools, ...debugTools];
   }
 
-  async callTool(name, rawArguments) {
+  async callTool(name, rawArguments, options = {}) {
     debugLog(`[StatefulBackend] callTool(${name}) - state: ${this._state}`);
 
     // Handle connection management tools
     switch (name) {
       case 'enable':
-        return await this._handleEnable(rawArguments);
+        return await this._handleEnable(rawArguments, options);
 
       case 'disable':
-        return await this._handleDisable();
+        return await this._handleDisable(options);
 
       case 'browser_list':
-        return await this._handleBrowserList();
+        return await this._handleBrowserList(options);
 
       case 'browser_connect':
-        return await this._handleBrowserConnect(rawArguments);
+        return await this._handleBrowserConnect(rawArguments, options);
 
       case 'status':
-        return await this._handleStatus();
+        return await this._handleStatus(options);
 
       case 'auth':
-        return await this._handleAuth(rawArguments);
+        return await this._handleAuth(rawArguments, options);
+
+      case 'scripting':
+        return await this._handleScripting(rawArguments, options);
 
       case 'reload_mcp':
-        return await this._handleReloadMCP();
+        return await this._handleReloadMCP(options);
     }
 
     // Forward to active backend
     if (!this._activeBackend) {
+      if (options.rawResult) {
+        return {
+          success: false,
+          error: 'not_enabled',
+          message: 'Browser automation not active. Call enable first.'
+        };
+      }
       return {
         content: [{
           type: 'text',
@@ -352,12 +395,15 @@ class StatefulBackend {
       };
     }
 
-    return await this._activeBackend.callTool(name, rawArguments);
+    return await this._activeBackend.callTool(name, rawArguments, options);
   }
 
-  async _handleEnable(args = {}) {
+  async _handleEnable(args = {}, options = {}) {
     // Validate client_id parameter
     if (!args.client_id || typeof args.client_id !== 'string' || args.client_id.trim().length === 0) {
+      if (options.rawResult) {
+        return { success: false, error: 'missing_client_id', message: 'client_id parameter is required' };
+      }
       return {
         content: [{
           type: 'text',
@@ -368,6 +414,16 @@ class StatefulBackend {
     }
 
     if (this._state !== 'passive') {
+      if (options.rawResult) {
+        return {
+          success: true,
+          already_enabled: true,
+          state: this._state,
+          mode: this._isAuthenticated ? 'pro' : 'free',
+          browser: this._connectedBrowserName,
+          client_id: this._clientId
+        };
+      }
       return {
         content: [{
           type: 'text',
@@ -390,12 +446,15 @@ class StatefulBackend {
     const forceFree = args.force_free === true;
     if (forceFree) {
       debugLog('[StatefulBackend] force_free=true, forcing free mode (standalone)');
-      return await this._becomePrimary();
+      return await this._becomePrimary(options);
     }
 
     // Check if user has invalid token (authenticated but missing connectionUrl)
     if (this._isAuthenticated && !this._userInfo?.connectionUrl) {
       debugLog('[StatefulBackend] Invalid token: missing connection_url');
+      if (options.rawResult) {
+        return { success: false, error: 'invalid_token', message: 'Authentication token is missing connection_url' };
+      }
       return {
         content: [{
           type: 'text',
@@ -421,14 +480,14 @@ class StatefulBackend {
     // Choose mode based on authentication
     if (this._isAuthenticated && this._userInfo?.connectionUrl) {
       debugLog('[StatefulBackend] Starting authenticated proxy mode');
-      return await this._connectToProxy();
+      return await this._connectToProxy(options);
     } else {
       debugLog('[StatefulBackend] Starting standalone mode');
-      return await this._becomePrimary();
+      return await this._becomePrimary(options);
     }
   }
 
-  async _becomePrimary() {
+  async _becomePrimary(options = {}) {
     try {
       debugLog('[StatefulBackend] Starting extension server...');
 
@@ -496,6 +555,17 @@ class StatefulBackend {
         debugLog('[StatefulBackend] Error sending notification:', err)
       );
 
+      if (options.rawResult) {
+        return {
+          success: true,
+          state: this._state,
+          mode: 'free',
+          browser: this._connectedBrowserName,
+          client_id: this._clientId,
+          port: this._config.port || 5555
+        };
+      }
+
       return {
         content: [{
           type: 'text',
@@ -527,6 +597,15 @@ class StatefulBackend {
         error.message.includes(`port ${port}`)
       );
 
+      if (options.rawResult) {
+        return {
+          success: false,
+          error: isPortError ? 'port_in_use' : 'connection_failed',
+          message: error.message,
+          port: port
+        };
+      }
+
       const errorMsg = isPortError
         ? `Port ${port} already in use. Disable MCP in other project or switch to PRO mode: https://blueprint-mcp.railsblueprint.com/pro`
         : `### Connection Failed\n\nFailed to start server:\n${error.message}`;
@@ -541,7 +620,7 @@ class StatefulBackend {
     }
   }
 
-  async _connectToProxy() {
+  async _connectToProxy(options = {}) {
     try {
       debugLog('[StatefulBackend] Connecting to remote proxy:', this._userInfo.connectionUrl);
       debugLog('[StatefulBackend] Client ID:', this._clientId);
@@ -677,6 +756,18 @@ class StatefulBackend {
           debugLog('[StatefulBackend] Failed to get build info:', e.message);
         }
 
+        if (options.rawResult) {
+          return {
+            success: true,
+            state: this._state,
+            mode: 'pro',
+            browser: this._connectedBrowserName,
+            browser_id: browsers[0].id,
+            client_id: this._clientId,
+            email: this._userInfo.email
+          };
+        }
+
         return {
           content: [{
             type: 'text',
@@ -724,6 +815,18 @@ class StatefulBackend {
         browserList += `**Example:**\n`;
         browserList += `\`\`\`\nbrowser_connect browser_id='${browsers[0].id}'\n\`\`\``;
 
+        if (options.rawResult) {
+          return {
+            success: true,
+            state: this._state,
+            mode: 'pro',
+            multiple_browsers: true,
+            browsers: browsers.map(b => ({ id: b.id, name: b.name || 'Browser', version: b.version })),
+            client_id: this._clientId,
+            email: this._userInfo.email
+          };
+        }
+
         return {
           content: [{
             type: 'text',
@@ -733,6 +836,10 @@ class StatefulBackend {
       }
     } catch (error) {
       debugLog('[StatefulBackend] Failed to connect to proxy:', error);
+
+      if (options.rawResult) {
+        return { success: false, error: 'connection_failed', message: error.message };
+      }
 
       return {
         content: [{
@@ -744,8 +851,11 @@ class StatefulBackend {
     }
   }
 
-  async _handleDisable() {
+  async _handleDisable(options = {}) {
     if (this._state === 'passive') {
+      if (options.rawResult) {
+        return { success: true, already_disabled: true, state: 'passive' };
+      }
       return {
         content: [{
           type: 'text',
@@ -785,6 +895,10 @@ class StatefulBackend {
       debugLog('[StatefulBackend] Error sending notification:', err)
     );
 
+    if (options.rawResult) {
+      return { success: true, state: 'passive' };
+    }
+
     return {
       content: [{
         type: 'text',
@@ -794,7 +908,24 @@ class StatefulBackend {
     };
   }
 
-  async _handleStatus() {
+  async _handleStatus(options = {}) {
+    // Build structured status for rawResult mode
+    const statusData = {
+      state: this._state,
+      mode: this._isAuthenticated ? 'pro' : 'free',
+      browser: this._connectedBrowserName,
+      client_id: this._clientId,
+      attached_tab: this._attachedTab ? {
+        index: this._attachedTab.index,
+        title: this._attachedTab.title,
+        url: this._attachedTab.url
+      } : null
+    };
+
+    if (options.rawResult) {
+      return statusData;
+    }
+
     if (this._state === 'passive') {
       return {
         content: [{
@@ -1377,6 +1508,143 @@ class StatefulBackend {
               `**Status:** ✅ PRO Account\n\n` +
               `You have access to all PRO features including unlimited browser tabs!`
       }]
+    };
+  }
+
+  async _handleScripting(args, options = {}) {
+    debugLog('[StatefulBackend] Handling scripting:', args);
+
+    const action = args.action;
+
+    if (action === 'instructions') {
+      // Get all tools for method list
+      const allTools = await this.listTools();
+      const instructions = wrappers.getInstructions(allTools);
+
+      if (options.rawResult) {
+        return {
+          languages: wrappers.getAvailableLanguages(),
+          tools: allTools.filter(t => t.name !== 'scripting').map(t => t.name)
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: instructions
+        }]
+      };
+    }
+
+    if (action === 'install_wrapper') {
+      // Validate parameters
+      if (!args.language) {
+        const errorMsg = 'Missing required parameter: language (python, javascript, or ruby)';
+        if (options.rawResult) {
+          return { success: false, error: 'missing_language', message: errorMsg };
+        }
+        return {
+          content: [{ type: 'text', text: `### Error\n\n${errorMsg}` }],
+          isError: true
+        };
+      }
+
+      if (!args.path) {
+        const errorMsg = 'Missing required parameter: path (file path to save wrapper)';
+        if (options.rawResult) {
+          return { success: false, error: 'missing_path', message: errorMsg };
+        }
+        return {
+          content: [{ type: 'text', text: `### Error\n\n${errorMsg}` }],
+          isError: true
+        };
+      }
+
+      const language = args.language.toLowerCase();
+      const availableLanguages = wrappers.getAvailableLanguages();
+
+      if (!availableLanguages.includes(language)) {
+        const errorMsg = `Unknown language: ${language}. Available: ${availableLanguages.join(', ')}`;
+        if (options.rawResult) {
+          return { success: false, error: 'unknown_language', message: errorMsg };
+        }
+        return {
+          content: [{ type: 'text', text: `### Error\n\n${errorMsg}` }],
+          isError: true
+        };
+      }
+
+      try {
+        // Get all tools and generate wrapper
+        const allTools = await this.listTools();
+        const wrapperCode = wrappers.generateWrapper(language, allTools);
+
+        // Resolve the path
+        const filePath = path.resolve(args.path);
+
+        // Ensure directory exists
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Write the wrapper file
+        fs.writeFileSync(filePath, wrapperCode, 'utf-8');
+
+        debugLog('[StatefulBackend] Wrapper written to:', filePath);
+
+        if (options.rawResult) {
+          return {
+            success: true,
+            language,
+            path: filePath,
+            methods: allTools.filter(t => t.name !== 'scripting').map(t => t.name)
+          };
+        }
+
+        const ext = wrappers.getFileExtension(language);
+        const importExample = language === 'python'
+          ? `from ${path.basename(filePath, ext)} import BlueprintMCP`
+          : language === 'javascript'
+          ? `import { BlueprintMCP } from './${path.basename(filePath)}';`
+          : `require_relative '${path.basename(filePath, ext)}'`;
+
+        return {
+          content: [{
+            type: 'text',
+            text: `### Wrapper Installed\n\n` +
+                  `**Language:** ${language}\n` +
+                  `**Path:** ${filePath}\n\n` +
+                  `**Usage:**\n\`\`\`\n${importExample}\n\n` +
+                  `bp = BlueprintMCP${language === 'javascript' ? '()' : language === 'python' ? '()' : '.new'}\n` +
+                  `bp.enable(client_id${language === 'ruby' ? ':' : language === 'javascript' ? ': ' : '='}\'my-script\')\n` +
+                  `\`\`\``
+          }]
+        };
+      } catch (error) {
+        debugLog('[StatefulBackend] Error writing wrapper:', error);
+
+        if (options.rawResult) {
+          return { success: false, error: 'write_failed', message: error.message };
+        }
+
+        return {
+          content: [{
+            type: 'text',
+            text: `### Error\n\nFailed to write wrapper: ${error.message}`
+          }],
+          isError: true
+        };
+      }
+    }
+
+    const errorMsg = `Unknown scripting action: ${action}. Use 'instructions' or 'install_wrapper'.`;
+    if (options.rawResult) {
+      return { success: false, error: 'unknown_action', message: errorMsg };
+    }
+    return {
+      content: [{ type: 'text', text: `### Error\n\n${errorMsg}` }],
+      isError: true
     };
   }
 
