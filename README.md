@@ -1,50 +1,147 @@
 # Multi-Browser MCP
 
-> Control your real browser with AI through the Model Context Protocol — with support for multiple concurrent sessions
+> Run multiple AI-powered browser sessions simultaneously — without losing your logins
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-## Why This Fork Exists
+## The Problem This Solves
 
-This is a fork of [Blueprint MCP](https://github.com/railsblueprint/blueprint-mcp) created to add **multi-instance support** for parallel Claude Code sessions.
+If you use Claude Code (or similar AI coding assistants) with browser automation, you've probably hit this wall: **you can only run one session at a time.**
 
-### The Problem
+Try to open a second Claude Code session that needs the browser? They fight over the same window. One session navigates to Stripe, the other tries to go to Sentry, and suddenly both are broken.
 
-When working with Claude Code, I frequently run multiple sessions simultaneously — one for daily operations (health checks, monitoring dashboards), another for development work, and sometimes a third for research. Each session needs browser access to interact with authenticated services like Sentry, Stripe, and internal dashboards.
+This is a fork of [Blueprint MCP](https://github.com/railsblueprint/blueprint-mcp) that adds **multi-instance support** — so each AI session gets its own browser window while sharing your authenticated state.
 
-Current browser MCP implementations (including the original Blueprint MCP and BrowserMCP) are single-instance: they control one browser session at a time. When two Claude Code sessions try to use Browser MCP simultaneously, they conflict — fighting over the same browser window and corrupting each other's navigation state.
+## Real Workflows This Enables
 
-### Why Not Use Existing Solutions?
+### Parallel Frontend Testing with Git Worktrees
+
+You're working on multiple PRs simultaneously using git worktrees. Each PR needs browser testing:
+
+```
+Terminal 1: claude (worktree: feature/new-dashboard)
+  → "Test the dashboard layout, click through the nav"
+  → Browser Window 1: localhost:3001
+
+Terminal 2: claude (worktree: bugfix/login-redirect)
+  → "Verify the login redirect works correctly"
+  → Browser Window 2: localhost:3002
+
+Terminal 3: claude (worktree: feature/settings-page)
+  → "Check the settings form validation"
+  → Browser Window 3: localhost:3003
+```
+
+Each Claude session controls its own browser window. No conflicts. No "wait, why did you navigate away?"
+
+### Multi-Project Operations
+
+You're juggling multiple projects that all need browser interaction:
+
+```
+Session 1: Daily health checks
+  → Checking Sentry for new errors
+  → Reviewing Stripe for churns/conversions
+  → Scanning support inbox in Gmail
+
+Session 2: Development work
+  → Testing your app in the browser
+  → Checking GitHub PR status
+  → Reading documentation
+
+Session 3: Research
+  → Searching for API documentation
+  → Comparing competitor products
+  → Reading technical blog posts
+```
+
+Without multi-instance support, you'd have to serialize all this work — finish one thing completely before starting another. With Multi-Browser MCP, they all run in parallel.
+
+### Email Triage Across Multiple Accounts
+
+You manage multiple inboxes — work, personal, a shared support queue:
+
+```
+Session 1: "Triage the support inbox, flag anything urgent"
+  → Browser Window 1: support@company.com
+
+Session 2: "Check my personal email for that shipping notification"
+  → Browser Window 2: me@gmail.com
+
+Session 3: "Review the sales inbox for new leads"
+  → Browser Window 3: sales@company.com
+```
+
+Each session works independently without stepping on the others.
+
+## Why Existing Solutions Don't Work
 
 **BrowserMCP (browsermcp.io):**
-- Chrome extension is closed source — can't modify or contribute
-- Server can't be built from source (missing monorepo dependencies)
-- Project appears semi-abandoned (98 open issues, minimal maintainer response)
+- Chrome extension is closed source — can't fix or improve it
+- Server can't be built from source (missing dependencies)
+- Single-instance only, 98+ open issues, minimal maintenance
 
 **concurrent-browser-mcp:**
-- Uses Playwright to spawn fresh browser instances
-- Each instance requires re-authentication to every service
-- Heavy dependency, significant bloat
+- Spawns fresh Playwright browser instances
+- You have to **re-login to every service** in each instance
+- Want to check Stripe? Login again. Sentry? Login again. Gmail? Login again.
+- Heavy Playwright dependency adds bloat
 
-### What We Need
+**What we actually need:**
+- Multiple browser windows that **share your authenticated sessions**
+- Logged into Gmail once? All sessions can use it
+- Lightweight (no Playwright)
+- Fully open source so we can fix things
 
-The ideal solution preserves what makes Blueprint MCP valuable:
-- **Real browser with authenticated sessions** — no re-logging into services
-- **Chrome DevTools Protocol** — lightweight, no Playwright dependency
-- **Full open source** — server AND extension source available
+## How It Works
 
-And adds:
-- **Multiple concurrent contexts** — each Claude Code session gets its own isolated browser window/tab while sharing the same authenticated browser profile
+Each Claude Code session gets its own browser context (window/tab group) while sharing:
+- Cookies and authentication state
+- LocalStorage
+- Your browser profile and extensions
 
-### Project Status
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ Claude Session 1│     │ Claude Session 2│     │ Claude Session 3│
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Multi-Browser MCP     │
+                    │   (session routing)     │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+     ┌────────▼────────┐ ┌──────▼───────┐ ┌───────▼───────┐
+     │ Browser Window 1│ │Browser Window 2│ │Browser Window 3│
+     │   (Session 1)   │ │   (Session 2)  │ │   (Session 3)  │
+     └─────────────────┘ └────────────────┘ └───────────────┘
+              │                  │                  │
+              └──────────────────┼──────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Your Chrome Profile   │
+                    │  (shared auth state)    │
+                    └─────────────────────────┘
+```
 
-This fork is in active development. The goal is to add multi-instance support and potentially contribute the changes back upstream.
+## Project Status
+
+This fork is in active development. The core Blueprint MCP functionality works today — we're adding the multi-instance layer.
+
+**What works now:** Everything from Blueprint MCP (single session browser control)
+
+**What we're building:** Session multiplexing so multiple clients can connect simultaneously
 
 **Tracking:** [dmorrill/startup-ideas#1](https://github.com/dmorrill/startup-ideas/issues/1)
 
 ---
 
-## Original Blueprint MCP Documentation
+## Blueprint MCP Documentation
+
+*The following documentation is from the upstream Blueprint MCP project. Installation and usage instructions will be updated once multi-instance support is complete.*
 
 ## What is this?
 
