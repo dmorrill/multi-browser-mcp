@@ -1,9 +1,50 @@
-# Blueprint MCP
+# Multi-Browser MCP
 
-> Control your real browser with AI through the Model Context Protocol
+> Control your real browser with AI through the Model Context Protocol — with support for multiple concurrent sessions
 
-[![npm version](https://badge.fury.io/js/@railsblueprint%2Fblueprint-mcp.svg)](https://www.npmjs.com/package/@railsblueprint/blueprint-mcp)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+## Why This Fork Exists
+
+This is a fork of [Blueprint MCP](https://github.com/railsblueprint/blueprint-mcp) created to add **multi-instance support** for parallel Claude Code sessions.
+
+### The Problem
+
+When working with Claude Code, I frequently run multiple sessions simultaneously — one for daily operations (health checks, monitoring dashboards), another for development work, and sometimes a third for research. Each session needs browser access to interact with authenticated services like Sentry, Stripe, and internal dashboards.
+
+Current browser MCP implementations (including the original Blueprint MCP and BrowserMCP) are single-instance: they control one browser session at a time. When two Claude Code sessions try to use Browser MCP simultaneously, they conflict — fighting over the same browser window and corrupting each other's navigation state.
+
+### Why Not Use Existing Solutions?
+
+**BrowserMCP (browsermcp.io):**
+- Chrome extension is closed source — can't modify or contribute
+- Server can't be built from source (missing monorepo dependencies)
+- Project appears semi-abandoned (98 open issues, minimal maintainer response)
+
+**concurrent-browser-mcp:**
+- Uses Playwright to spawn fresh browser instances
+- Each instance requires re-authentication to every service
+- Heavy dependency, significant bloat
+
+### What We Need
+
+The ideal solution preserves what makes Blueprint MCP valuable:
+- **Real browser with authenticated sessions** — no re-logging into services
+- **Chrome DevTools Protocol** — lightweight, no Playwright dependency
+- **Full open source** — server AND extension source available
+
+And adds:
+- **Multiple concurrent contexts** — each Claude Code session gets its own isolated browser window/tab while sharing the same authenticated browser profile
+
+### Project Status
+
+This fork is in active development. The goal is to add multi-instance support and potentially contribute the changes back upstream.
+
+**Tracking:** [dmorrill/startup-ideas#1](https://github.com/dmorrill/startup-ideas/issues/1)
+
+---
+
+## Original Blueprint MCP Documentation
 
 ## What is this?
 
