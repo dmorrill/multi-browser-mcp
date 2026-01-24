@@ -129,13 +129,113 @@ Each Claude Code session gets its own browser context (window/tab group) while s
 
 ## Project Status
 
-This fork is in active development. The core Blueprint MCP functionality works today — we're adding the multi-instance layer.
+**Multi-session support is now implemented.** You can run multiple Claude Code sessions simultaneously, each controlling its own browser tab.
 
-**What works now:** Everything from Blueprint MCP (single session browser control)
-
-**What we're building:** Session multiplexing so multiple clients can connect simultaneously
+**What works:**
+- Everything from Blueprint MCP (single session browser control)
+- **Multi-session mode:** Multiple Claude Code instances connect to separate tabs
+- **Auto-port selection:** Each MCP server picks an available port (5555-5654)
+- **Session isolation:** Each session has its own tab context
+- **Disconnect indicators:** Badge turns red when a session disconnects (tab stays open)
 
 **Tracking:** [dmorrill/startup-ideas#1](https://github.com/dmorrill/startup-ideas/issues/1)
+
+## Multi-Session Setup
+
+### Enabling Multi-Session Mode
+
+Multi-session mode is opt-in to maintain backward compatibility. To enable it:
+
+1. **Open Chrome DevTools Console** (Cmd+Option+J / Ctrl+Shift+J)
+2. **Run this command:**
+   ```javascript
+   chrome.storage.local.set({ multiSessionMode: true })
+   ```
+3. **Reload the extension** at `chrome://extensions/`
+
+### How Multi-Session Works
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ Claude Code #1  │     │ Claude Code #2  │     │ Claude Code #3  │
+│  (Terminal 1)   │     │  (Terminal 2)   │     │  (Terminal 3)   │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │ :5555                 │ :5556                 │ :5557
+         ▼                       ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ MCP Server #1   │     │ MCP Server #2   │     │ MCP Server #3   │
+│ Session: a3f9   │     │ Session: b7c2   │     │ Session: d1e5   │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Chrome Extension      │
+                    │  (Multi-Session Mgr)    │
+                    │                         │
+                    │  Port Scanning:         │
+                    │  5555-5654 range        │
+                    │                         │
+                    │  Auto-discovers new     │
+                    │  MCP servers every 5s   │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+     ┌────────▼────────┐ ┌──────▼───────┐ ┌───────▼───────┐
+     │ Tab (Session 1) │ │Tab (Session 2)│ │Tab (Session 3)│
+     │   Badge: "a3"   │ │  Badge: "b7"  │ │  Badge: "d1"  │
+     │   Color: Green  │ │  Color: Green │ │  Color: Green │
+     └─────────────────┘ └────────────────┘ └───────────────┘
+              │                  │                  │
+              └──────────────────┼──────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Shared Chrome Profile │
+                    │  (cookies, auth, etc)   │
+                    └─────────────────────────┘
+```
+
+### Session Badge Indicators
+
+Each tab shows a badge indicating its session status:
+
+| Badge | Color | Meaning |
+|-------|-------|---------|
+| `a3` | Green | Tab is connected to session "a3f9" |
+| `b7` | Green | Tab is connected to session "b7c2" |
+| `✕` | Red | Session disconnected (tab stays open) |
+
+### Running Multiple Sessions
+
+Simply start multiple Claude Code sessions — each one automatically gets its own port:
+
+```bash
+# Terminal 1
+cd ~/project-a
+claude  # Gets port 5555, session ID "a3f9"
+
+# Terminal 2
+cd ~/project-b
+claude  # Gets port 5556, session ID "b7c2"
+
+# Terminal 3
+cd ~/project-c
+claude  # Gets port 5557, session ID "d1e5"
+```
+
+The extension automatically discovers new MCP servers and creates isolated tab contexts for each.
+
+### Disabling Multi-Session Mode
+
+To return to single-session mode:
+
+```javascript
+chrome.storage.local.set({ multiSessionMode: false })
+```
+
+Then reload the extension.
 
 ---
 

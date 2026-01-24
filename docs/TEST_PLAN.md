@@ -8,8 +8,9 @@ This test plan validates that Multi-Browser MCP delivers on its core promises:
 ## Prerequisites
 
 Before testing:
-- [ ] Multi-instance support is implemented
+- [x] Multi-instance support is implemented (completed Jan 2026)
 - [ ] Extension is built and loadable
+- [ ] Multi-session mode enabled in extension (see README)
 - [ ] MCP server runs locally
 - [ ] Chrome browser with logged-in sessions (Gmail, GitHub, etc.)
 
@@ -368,24 +369,47 @@ For Multi-Browser MCP to be considered working:
 ## Running the Tests
 
 ```bash
-# When implementation is ready:
-
 # 1. Build and install locally
 cd multi-browser-mcp
-npm install
-npm run build
+cd server && npm install && cd ..
+cd extensions/chrome && npm install && npm run build && cd ../..
 
 # 2. Load extension in Chrome
-# Chrome > Extensions > Load unpacked > select extensions/chrome/dist
+# Chrome > Extensions > Developer mode > Load unpacked > select extensions/chrome/dist
 
-# 3. Start MCP server
-npm run dev
+# 3. Enable multi-session mode in the extension
+# Open Chrome DevTools Console (Cmd+Option+J) and run:
+#   chrome.storage.local.set({ multiSessionMode: true })
+# Then reload the extension
 
 # 4. Configure Claude Code
 claude mcp add multi-browser -- node /path/to/multi-browser-mcp/server/cli.js
 
 # 5. Open multiple terminals and run tests
+# Terminal 1: claude  # Gets port 5555
+# Terminal 2: claude  # Gets port 5556
+# Terminal 3: claude  # Gets port 5557
+
+# 6. Each session will auto-discover available MCP servers
+# Check extension badge - should show session ID (e.g., "a3", "b7")
 ```
+
+## Verifying Multi-Session is Working
+
+1. **Check console output** when starting MCP server:
+   ```
+   [Multi-Browser MCP] Session abc1 ready on port 5555
+   ```
+
+2. **Check extension badge** on attached tabs:
+   - Green badge with 2-char session ID = connected
+   - Red badge with ✕ = session disconnected
+
+3. **Check extension logs** in DevTools (Service Worker):
+   ```
+   [MultiSession] Active sessions: 2
+   [MultiSession] Connected to session abc1 on port 5555
+   ```
 
 ---
 
