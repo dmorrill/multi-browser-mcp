@@ -3,11 +3,16 @@
  *
  * Simple WebSocket server that extension connects to.
  * Replaces Playwright's CDPRelayServer with our own lightweight implementation.
+ *
+ * Multi-session support: Each MCP server instance gets a unique session ID
+ * and auto-selects an available port from the range 5555-5654.
  */
 
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const { getLogger } = require('./fileLogger');
+const crypto = require('crypto');
+const net = require('net');
 
 function debugLog(...args) {
   if (global.DEBUG_MODE) {
@@ -16,10 +21,47 @@ function debugLog(...args) {
   }
 }
 
+/**
+ * Check if a port is available
+ */
+async function isPortAvailable(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port, host);
+  });
+}
+
+/**
+ * Find an available port in range
+ */
+async function findAvailablePort(startPort = 5555, endPort = 5654, host = '127.0.0.1') {
+  for (let port = startPort; port <= endPort; port++) {
+    if (await isPortAvailable(port, host)) {
+      return port;
+    }
+  }
+  throw new Error(`No available ports in range ${startPort}-${endPort}`);
+}
+
+/**
+ * Generate a short, readable session ID
+ */
+function generateSessionId() {
+  // Generate 4-character alphanumeric ID (e.g., "a3f9")
+  return crypto.randomBytes(2).toString('hex');
+}
+
 class ExtensionServer {
-  constructor(port = 5555, host = '127.0.0.1') {
-    this._port = port;
+  constructor(port = 5555, host = '127.0.0.1', autoPort = true) {
+    this._requestedPort = port;
+    this._port = port; // Will be updated if auto-port is used
     this._host = host;
+    this._autoPort = autoPort; // If true, find available port if requested port is in use
     this._httpServer = null;
     this._wss = null;
     this._extensionWs = null; // Current extension WebSocket connection
@@ -30,6 +72,21 @@ class ExtensionServer {
     this._browserType = 'chrome'; // Browser type: 'chrome' or 'firefox'
     this._buildTimestamp = null; // Extension build timestamp
     this._pingInterval = null; // Ping interval to keep connection alive
+    this._sessionId = generateSessionId(); // Unique session ID for this server instance
+  }
+
+  /**
+   * Get the session ID for this server
+   */
+  getSessionId() {
+    return this._sessionId;
+  }
+
+  /**
+   * Get the actual port being used (may differ from requested if auto-port enabled)
+   */
+  getPort() {
+    return this._port;
   }
 
   /**
@@ -50,11 +107,29 @@ class ExtensionServer {
    * Start the server
    */
   async start() {
+    // Auto-select available port if requested port is in use
+    if (this._autoPort) {
+      const isAvailable = await isPortAvailable(this._requestedPort, this._host);
+      if (!isAvailable) {
+        debugLog(`Port ${this._requestedPort} is in use, finding available port...`);
+        this._port = await findAvailablePort(this._requestedPort, this._requestedPort + 99, this._host);
+        debugLog(`Auto-selected port ${this._port}`);
+      } else {
+        this._port = this._requestedPort;
+      }
+    }
+
     return new Promise((resolve, reject) => {
       // Create HTTP server
       this._httpServer = http.createServer((req, res) => {
-        res.writeHead(200);
-        res.end('Extension WebSocket Server');
+        // Return server info as JSON for discovery
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          type: 'multi-browser-mcp',
+          sessionId: this._sessionId,
+          port: this._port,
+          status: this._extensionWs ? 'connected' : 'waiting'
+        }));
       });
 
       // Create WebSocket server
@@ -67,28 +142,17 @@ class ExtensionServer {
       });
 
       this._wss.on('connection', (ws) => {
-        debugLog('Extension connection attempt');
+        debugLog(`Extension connection attempt (session: ${this._sessionId})`);
 
-        // If we already have an active connection, reject the new one
+        // Multi-session: Accept new connections, replacing old ones
+        // The extension may reconnect when switching between sessions
         if (this._extensionWs && this._extensionWs.readyState === 1) {
-          debugLog('Rejecting new connection - browser already connected');
-
-          // Send error message to the new connection
-          const errorMsg = {
-            jsonrpc: '2.0',
-            error: {
-              code: -32001,
-              message: 'Another browser is already connected. Only one browser can be connected at a time.'
-            }
-          };
-          ws.send(JSON.stringify(errorMsg));
-
-          // Close the new connection after a short delay to ensure message is sent
-          setTimeout(() => ws.close(1008, 'Already connected'), 100);
-          return;
+          debugLog('Replacing existing connection with new one');
+          // Close the old connection gracefully
+          this._extensionWs.close(1000, 'Replaced by new connection');
         }
 
-        debugLog('Extension connected');
+        debugLog(`Extension connected (session: ${this._sessionId})`);
 
         // Close previous connection if any (only if it's dead/closing)
         const isReconnection = !!this._extensionWs;
@@ -153,7 +217,12 @@ class ExtensionServer {
 
       // Start listening
       this._httpServer.listen(this._port, this._host, () => {
-        debugLog(`Server listening on ${this._host}:${this._port}`);
+        debugLog(`Server listening on ${this._host}:${this._port} (session: ${this._sessionId})`);
+        // Log to stderr for user visibility even in non-debug mode
+        if (this._port !== this._requestedPort) {
+          console.error(`[Multi-Browser MCP] Port ${this._requestedPort} was in use, using port ${this._port} instead`);
+        }
+        console.error(`[Multi-Browser MCP] Session ${this._sessionId} ready on port ${this._port}`);
         resolve();
       });
     });
@@ -196,6 +265,21 @@ class ExtensionServer {
         this._browserType = message.browser || 'chrome';
         this._buildTimestamp = message.buildTimestamp || null;
         debugLog(`Browser type detected: ${this._browserType}, Build timestamp: ${this._buildTimestamp}`);
+        debugLog(`Session ID: ${this._sessionId}`);
+
+        // Send session info back to extension
+        if (this._extensionWs && this._extensionWs.readyState === 1) {
+          const sessionInfo = {
+            jsonrpc: '2.0',
+            method: 'session_info',
+            params: {
+              sessionId: this._sessionId,
+              port: this._port
+            }
+          };
+          this._extensionWs.send(JSON.stringify(sessionInfo));
+          debugLog('Sent session_info to extension');
+        }
         return;
       }
 

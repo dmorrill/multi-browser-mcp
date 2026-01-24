@@ -513,9 +513,16 @@ class StatefulBackend {
       debugLog('[StatefulBackend] Starting extension server...');
 
       // Create our WebSocket server for extension connection
+      // Auto-port enabled by default to support multiple concurrent sessions
       const port = this._config.port || 5555;
-      this._extensionServer = new ExtensionServer(port, '127.0.0.1');
+      const autoPort = this._config.autoPort !== false; // Default true
+      this._extensionServer = new ExtensionServer(port, '127.0.0.1', autoPort);
       await this._extensionServer.start();
+
+      // Log session info for multi-session awareness
+      const sessionId = this._extensionServer.getSessionId();
+      const actualPort = this._extensionServer.getPort();
+      debugLog(`[StatefulBackend] Session ${sessionId} listening on port ${actualPort}`);
 
       // Send client_id to extension if connected
       if (this._clientId) {
