@@ -333,6 +333,14 @@ export class MultiSessionManager {
 
     this.logger.log(`[MultiSession] Disconnecting from session ${session.sessionId} on port ${port}...`);
 
+    // Update UI indicator on attached tab BEFORE cleanup
+    // Tab stays open but shows disconnect indicator
+    if (session.attachedTabId) {
+      await this.markTabDisconnected(session.attachedTabId, session.sessionId);
+    }
+
+    session.status = 'disconnected';
+
     if (session.wsConnection) {
       session.wsConnection.disconnect();
     }
@@ -346,6 +354,59 @@ export class MultiSessionManager {
     }
 
     this.logger.log(`[MultiSession] Disconnected from port ${port}`);
+  }
+
+  /**
+   * Mark a tab as disconnected with visual indicator
+   * Tab stays open but badge shows session ended
+   */
+  async markTabDisconnected(tabId, sessionId) {
+    try {
+      // Check if tab still exists
+      const tab = await this.browser.tabs.get(tabId);
+      if (!tab) return;
+
+      // Set badge to show disconnect (red background, "X" text)
+      await this.browser.action.setBadgeText({
+        tabId: tabId,
+        text: '✕'  // X mark to indicate disconnected
+      });
+      await this.browser.action.setBadgeBackgroundColor({
+        tabId: tabId,
+        color: '#F44336'  // Red for disconnected
+      });
+
+      this.logger.log(`[MultiSession] Marked tab ${tabId} as disconnected (session ${sessionId})`);
+    } catch (error) {
+      // Tab may have been closed already
+      this.logger.log(`[MultiSession] Could not mark tab ${tabId} as disconnected:`, error.message);
+    }
+  }
+
+  /**
+   * Mark a tab as connected with visual indicator
+   * Shows session ID and green badge
+   */
+  async markTabConnected(tabId, sessionId) {
+    try {
+      // Check if tab still exists
+      const tab = await this.browser.tabs.get(tabId);
+      if (!tab) return;
+
+      // Set badge to show connected (green background, session ID prefix)
+      await this.browser.action.setBadgeText({
+        tabId: tabId,
+        text: sessionId.substring(0, 2)  // First 2 chars of session ID
+      });
+      await this.browser.action.setBadgeBackgroundColor({
+        tabId: tabId,
+        color: '#4CAF50'  // Green for connected
+      });
+
+      this.logger.log(`[MultiSession] Marked tab ${tabId} as connected (session ${sessionId})`);
+    } catch (error) {
+      this.logger.log(`[MultiSession] Could not mark tab ${tabId} as connected:`, error.message);
+    }
   }
 
   /**
