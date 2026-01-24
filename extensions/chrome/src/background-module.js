@@ -1852,15 +1852,77 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
   }
 });
 
-// Check if extension is enabled before connecting on startup
-const storage = await chrome.storage.local.get(['extensionEnabled']);
-const isEnabled = storage.extensionEnabled !== false; // default to true if not set
+// Check for multi-session mode
+const multiSessionStorage = await chrome.storage.local.get(['multiSessionMode']);
+const multiSessionEnabled = multiSessionStorage.multiSessionMode === true;
 
-if (isEnabled) {
-  // Connect to MCP server on startup
-  await wsConnection.connect();
+if (multiSessionEnabled) {
+  // Multi-session mode: use MultiSessionManager for parallel Claude Code sessions
+  logger.logAlways('[Background] Multi-session mode enabled - importing MultiSessionManager...');
+
+  // Dynamic import for multi-session support
+  const { MultiSessionManager } = await import('../../shared/connection/multiSession.js');
+
+  const sessionManager = new MultiSessionManager(chrome, logger, iconManager, null);
+  sessionManager.setBuildTimestamp(buildTimestamp);
+
+  // Register session-aware command handlers
+  // These wrap the existing handlers but use per-session tab state
+
+  sessionManager.registerCommandHandler('getTabs', async (params, session) => {
+    return await session.tabHandlers.getTabs();
+  });
+
+  sessionManager.registerCommandHandler('selectTab', async (params, session) => {
+    return await session.tabHandlers.selectTab(params);
+  });
+
+  sessionManager.registerCommandHandler('createTab', async (params, session) => {
+    return await session.tabHandlers.createTab(params);
+  });
+
+  sessionManager.registerCommandHandler('closeTab', async (params, session) => {
+    return await session.tabHandlers.closeTab(params?.index);
+  });
+
+  sessionManager.registerCommandHandler('get_build_info', async (params, session) => {
+    return { buildTimestamp };
+  });
+
+  // For CDP commands, we need to use the session's attached tab
+  sessionManager.registerCommandHandler('forwardCDPCommand', async (params, session) => {
+    // Override the global tabHandlers reference temporarily
+    // This is a workaround until full refactoring is complete
+    const originalGetAttachedTabId = tabHandlers.getAttachedTabId.bind(tabHandlers);
+    tabHandlers.getAttachedTabId = () => session.tabHandlers.getAttachedTabId();
+
+    try {
+      const result = await handleCDPCommand(params.method, params.params);
+      return result;
+    } finally {
+      // Restore original
+      tabHandlers.getAttachedTabId = originalGetAttachedTabId;
+    }
+  });
+
+  // Start multi-session manager
+  await sessionManager.start();
+
+  // Store reference for cleanup
+  globalThis.multiSessionManager = sessionManager;
+
+  logger.logAlways('[Background] Multi-session mode active - scanning for MCP servers...');
+
 } else {
-  logger.log('[Background] Extension is disabled, not connecting');
+  // Single-session mode: use original WebSocketConnection
+  const storage = await chrome.storage.local.get(['extensionEnabled']);
+  const isEnabled = storage.extensionEnabled !== false;
+
+  if (isEnabled) {
+    await wsConnection.connect();
+  } else {
+    logger.log('[Background] Extension is disabled, not connecting');
+  }
 }
 
 // End of main initialization
