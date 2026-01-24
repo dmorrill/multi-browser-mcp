@@ -8,17 +8,19 @@
  */
 
 import { WebSocketConnection } from './websocket.js';
+import { SessionTabHandlers } from '../handlers/sessionTabs.js';
 
 /**
  * Session state for a single MCP server connection
  * Each session has its own tab context - completely isolated from other sessions
  */
 class Session {
-  constructor(port, sessionId, browserAPI, logger) {
+  constructor(port, sessionId, browserAPI, logger, iconManager) {
     this.port = port;
     this.sessionId = sessionId;
     this.browser = browserAPI;
     this.logger = logger;
+    this.iconManager = iconManager;
     this.wsConnection = null;
 
     // Per-session tab state (each session controls its own tab)
@@ -26,6 +28,9 @@ class Session {
     this.attachedTabInfo = null;
     this.stealthMode = false;
     this.tabStealthModes = {}; // tabId -> boolean
+
+    // Create session-aware tab handlers
+    this.tabHandlers = new SessionTabHandlers(this, browserAPI, logger, iconManager);
 
     // Session metadata
     this.lastActivity = Date.now();
@@ -258,7 +263,7 @@ export class MultiSessionManager {
       const sessionId = serverInfo.sessionId || `port-${port}`;
 
       // Create session with browser API for per-session tab operations
-      const session = new Session(port, sessionId, this.browser, this.logger);
+      const session = new Session(port, sessionId, this.browser, this.logger, this.iconManager);
       session.status = 'connecting';
 
       // Create WebSocket connection with custom port
