@@ -21,7 +21,7 @@ Open a second Claude Code session that needs the browser? They fight over the sa
 ### Prerequisites
 
 - **Node.js 18+** — [Download](https://nodejs.org/)
-- **Chrome, Edge, or Opera** — (Firefox support coming soon)
+- **Chrome** — Multi-session mode currently Chrome-only (Edge/Opera untested, Firefox not yet supported)
 - **Claude Code** — [Install](https://claude.ai/claude-code) or use Claude Desktop
 
 ### Step 1: Clone and Build
