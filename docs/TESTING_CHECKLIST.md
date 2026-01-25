@@ -2,7 +2,7 @@
 
 **Date:** January 25, 2026
 **Tester:**
-**Browser:** Chrome version ______
+**Browser:** Google Chrome version ______ (Chrome only — other browsers not supported)
 **OS:** macOS / Windows / Linux
 
 ---
@@ -220,16 +220,6 @@
 
 ---
 
-## Part 6: Firefox (NOT YET SUPPORTED)
-
-> Firefox extension does not have multi-session changes yet
-
-- [ ] **Skip Firefox tests:** Multi-session mode not implemented for Firefox
-- [ ] **Single-session only:** Firefox can still be used in original single-session mode
-- [ ] **Future work:** Firefox multi-session support is a separate task
-
----
-
 ## Test Results Summary
 
 | Category | Passed | Failed | Notes |
@@ -240,6 +230,8 @@
 | Edge Cases | /8 | | |
 | Performance | /3 | | |
 | **TOTAL** | /43 | | |
+
+**Note:** Chrome only. Firefox, Edge, Safari, and other browsers are not supported.
 
 ---
 

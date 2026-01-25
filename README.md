@@ -4,7 +4,9 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
-[![Chrome](https://img.shields.io/badge/Chrome-Extension-blue.svg)](#installation)
+[![Chrome](https://img.shields.io/badge/Chrome-Only-blue.svg)](#installation)
+
+**Chrome only.** This extension currently supports Google Chrome. Firefox, Edge, Safari, and other browsers are not supported.
 
 ## The Problem
 
@@ -21,7 +23,7 @@ Open a second Claude Code session that needs the browser? They fight over the sa
 ### Prerequisites
 
 - **Node.js 18+** — [Download](https://nodejs.org/)
-- **Chrome** — Multi-session mode currently Chrome-only (Edge/Opera untested, Firefox not yet supported)
+- **Google Chrome** — [Download](https://www.google.com/chrome/)
 - **Claude Code** — [Install](https://claude.ai/claude-code) or use Claude Desktop
 
 ### Step 1: Clone and Build
@@ -90,7 +92,7 @@ claude
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | [Node.js](https://nodejs.org/) | 18+ | Runtime for MCP server |
-| [Chrome](https://www.google.com/chrome/) / [Edge](https://www.microsoft.com/edge) / [Opera](https://www.opera.com/) | Latest | Browser with extension support |
+| [Google Chrome](https://www.google.com/chrome/) | Latest | Browser with extension support |
 | [Claude Code](https://claude.ai/claude-code) or [Claude Desktop](https://claude.ai/download) | Latest | MCP client |
 
 ### Server Dependencies (installed automatically)
