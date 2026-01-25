@@ -122,14 +122,14 @@ class UnifiedBackend {
       // Tab management
       {
         name: 'browser_tabs',
-        description: 'STEP 2 (after enable): Manage browser tabs. List available tabs, create a new tab, attach to an existing tab for automation, or close a tab. You must attach to a tab before using other browser_ tools like navigate or interact.',
+        description: 'STEP 2 (after enable): Manage browser tabs. List available tabs, create a new tab, attach to an existing tab for automation, close a tab, or focus the attached tab. You must attach to a tab before using other browser_ tools like navigate or interact. Use "focus" to bring the attached tab to the foreground (useful when running multiple Claude sessions).',
         inputSchema: {
           type: 'object',
           properties: {
             action: {
               type: 'string',
-              enum: ['list', 'new', 'attach', 'close'],
-              description: 'Action to perform'
+              enum: ['list', 'new', 'attach', 'close', 'focus'],
+              description: 'Action to perform. Use "focus" to bring the attached tab to the foreground.'
             },
             url: {
               type: 'string',
@@ -146,6 +146,27 @@ class UnifiedBackend {
             stealth: {
               type: 'boolean',
               description: 'Enable stealth mode to avoid bot detection'
+            }
+          },
+          required: ['action']
+        }
+      },
+
+      // Session management (multi-instance)
+      {
+        name: 'browser_sessions',
+        description: 'Manage browser sessions when running multiple Claude Code instances. List all active sessions with their attached tabs, or close sessions to free up browser tabs. Use this when your browser has too many tabs from multiple sessions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: ['list', 'close', 'close_all'],
+              description: 'Action to perform. "list" shows all sessions, "close" closes a specific session\'s tab, "close_all" closes all other sessions\' tabs.'
+            },
+            port: {
+              type: 'number',
+              description: 'Port number of session to close (required for "close" action)'
             }
           },
           required: ['action']
@@ -626,6 +647,10 @@ class UnifiedBackend {
           result = await this._handleBrowserTabs(args, options);
           break;
 
+        case 'browser_sessions':
+          result = await this._handleBrowserSessions(args, options);
+          break;
+
         case 'browser_navigate':
           result = await this._handleNavigate(args, options);
           break;
@@ -966,7 +991,128 @@ class UnifiedBackend {
       };
     }
 
+    if (action === 'focus') {
+      // Focus the currently attached tab (bring to foreground)
+      const result = await this._transport.sendCommand('focusTab', {});
+
+      if (options.rawResult) {
+        return {
+          success: true,
+          action: 'focus',
+          tab: result.tab
+        };
+      }
+
+      if (!result.success) {
+        return {
+          content: [{
+            type: 'text',
+            text: `### ⚠️ No Tab Attached\n\nNo tab is currently attached to this session. Use \`browser_tabs\` with action "new" or "attach" first.`
+          }],
+          isError: true
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `### ✅ Tab Focused\n\n**Title:** ${result.tab?.title || 'Unknown'}\n**URL:** ${result.tab?.url || 'N/A'}\n\nThe browser tab has been brought to the foreground.`
+        }],
+        isError: false
+      };
+    }
+
     throw new Error(`Unknown browser_tabs action: ${action}`);
+  }
+
+  async _handleBrowserSessions(args, options = {}) {
+    const action = args.action;
+
+    if (action === 'list') {
+      // Get all active sessions from the extension
+      const result = await this._transport.sendCommand('getSessions', {});
+
+      if (options.rawResult) {
+        return result;
+      }
+
+      const sessions = result.sessions || [];
+      if (sessions.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: `### Browser Sessions\n\nNo active sessions found. This could mean:\n- Multi-session mode is not enabled in the extension\n- Only single-session mode is active\n\n**Current session:** Port ${result.currentPort || 'unknown'}`
+          }],
+          isError: false
+        };
+      }
+
+      const sessionList = sessions.map(s => {
+        const tabInfo = s.attachedTabId
+          ? `Tab #${s.attachedTabId}: ${s.attachedTabTitle || 'Untitled'}`
+          : 'No tab attached';
+        const status = s.status === 'connected' ? '🟢' : '🔴';
+        return `  ${status} **Port ${s.port}** (Session: ${s.sessionId})\n     ${tabInfo}`;
+      }).join('\n\n');
+
+      return {
+        content: [{
+          type: 'text',
+          text: `### Browser Sessions\n\n**Total:** ${sessions.length} active session(s)\n**Current session:** Port ${result.currentPort}\n\n${sessionList}\n\n**Actions:**\n- Use \`browser_sessions\` with action "close" and port number to close a session's tab\n- Use \`browser_sessions\` with action "close_all" to close all other sessions' tabs`
+        }],
+        isError: false
+      };
+    }
+
+    if (action === 'close') {
+      if (!args.port) {
+        throw new Error('Port number is required for "close" action');
+      }
+
+      const result = await this._transport.sendCommand('closeSession', {
+        port: args.port
+      });
+
+      if (options.rawResult) {
+        return result;
+      }
+
+      if (!result.success) {
+        return {
+          content: [{
+            type: 'text',
+            text: `### ⚠️ Could not close session\n\n${result.error || 'Session not found or already closed.'}`
+          }],
+          isError: true
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `### ✅ Session Closed\n\nSession on port ${args.port} has been closed and its tab has been released.`
+        }],
+        isError: false
+      };
+    }
+
+    if (action === 'close_all') {
+      const result = await this._transport.sendCommand('closeAllSessions', {});
+
+      if (options.rawResult) {
+        return result;
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `### ✅ Sessions Closed\n\nClosed ${result.closedCount || 0} session(s). Your current session remains active.`
+        }],
+        isError: false
+      };
+    }
+
+    throw new Error(`Unknown browser_sessions action: ${action}`);
   }
 
   async _handleNavigate(args, options = {}) {

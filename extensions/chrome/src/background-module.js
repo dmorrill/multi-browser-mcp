@@ -1665,6 +1665,10 @@ wsConnection.registerCommandHandler('closeTab', async (params) => {
   return await tabHandlers.closeTab(params?.index);
 });
 
+wsConnection.registerCommandHandler('focusTab', async () => {
+  return await tabHandlers.focusTab();
+});
+
 wsConnection.registerCommandHandler('openTestPage', async () => {
   // Open test page in new window
   const testPageUrl = 'https://blueprint-mcp.railsblueprint.com/test-page';
@@ -1885,6 +1889,10 @@ if (multiSessionEnabled) {
     return await session.tabHandlers.closeTab(params?.index);
   });
 
+  sessionManager.registerCommandHandler('focusTab', async (params, session) => {
+    return await session.tabHandlers.focusTab();
+  });
+
   sessionManager.registerCommandHandler('get_build_info', async (params, session) => {
     return { buildTimestamp };
   });
@@ -1903,6 +1911,19 @@ if (multiSessionEnabled) {
       // Restore original
       tabHandlers.getAttachedTabId = originalGetAttachedTabId;
     }
+  });
+
+  // Session management commands
+  sessionManager.registerCommandHandler('getSessions', async (params, session) => {
+    return await sessionManager.getSessionsForListing(session.port);
+  });
+
+  sessionManager.registerCommandHandler('closeSession', async (params, session) => {
+    return await sessionManager.closeSessionTab(params.port);
+  });
+
+  sessionManager.registerCommandHandler('closeAllSessions', async (params, session) => {
+    return await sessionManager.closeAllOtherSessionsTabs(session.port);
   });
 
   // Start multi-session manager

@@ -490,4 +490,101 @@ export class MultiSessionManager {
       sessions
     };
   }
+
+  /**
+   * Get detailed session info for listing to user
+   * Includes tab titles and URLs for better identification
+   */
+  async getSessionsForListing(currentPort) {
+    const sessions = [];
+
+    for (const [port, session] of this.sessions) {
+      let attachedTabTitle = null;
+      let attachedTabUrl = null;
+
+      // Get tab info if attached
+      if (session.attachedTabId) {
+        try {
+          const tab = await this.browser.tabs.get(session.attachedTabId);
+          attachedTabTitle = tab.title;
+          attachedTabUrl = tab.url;
+        } catch {
+          // Tab may no longer exist
+        }
+      }
+
+      sessions.push({
+        port,
+        sessionId: session.sessionId,
+        status: session.status,
+        attachedTabId: session.attachedTabId,
+        attachedTabTitle,
+        attachedTabUrl,
+        lastActivity: session.lastActivity,
+        isCurrent: port === currentPort
+      });
+    }
+
+    return {
+      totalSessions: this.sessions.size,
+      currentPort,
+      sessions
+    };
+  }
+
+  /**
+   * Close a specific session's tab (releases the tab but keeps session info)
+   */
+  async closeSessionTab(port) {
+    const session = this.sessions.get(port);
+    if (!session) {
+      return { success: false, error: `No session found on port ${port}` };
+    }
+
+    if (!session.attachedTabId) {
+      return { success: false, error: `Session on port ${port} has no attached tab` };
+    }
+
+    try {
+      // Close the tab
+      await this.browser.tabs.remove(session.attachedTabId);
+
+      // Clear the attachment
+      session.attachedTabId = null;
+      session.attachedTabInfo = null;
+
+      this.logger.log(`[MultiSession] Closed tab for session on port ${port}`);
+      return { success: true };
+    } catch (error) {
+      this.logger.log(`[MultiSession] Failed to close tab for session on port ${port}:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Close all other sessions' tabs (keeps current session)
+   */
+  async closeAllOtherSessionsTabs(currentPort) {
+    let closedCount = 0;
+
+    for (const [port, session] of this.sessions) {
+      if (port === currentPort) {
+        continue; // Skip current session
+      }
+
+      if (session.attachedTabId) {
+        try {
+          await this.browser.tabs.remove(session.attachedTabId);
+          session.attachedTabId = null;
+          session.attachedTabInfo = null;
+          closedCount++;
+        } catch {
+          // Tab may already be closed
+        }
+      }
+    }
+
+    this.logger.log(`[MultiSession] Closed ${closedCount} tabs from other sessions`);
+    return { success: true, closedCount };
+  }
 }

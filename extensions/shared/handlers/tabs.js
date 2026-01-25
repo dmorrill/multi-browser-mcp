@@ -351,6 +351,44 @@ export class TabHandlers {
   }
 
   /**
+   * Focus the attached tab (bring to foreground)
+   * Useful when running multiple Claude sessions to quickly jump to the right tab
+   */
+  async focusTab() {
+    if (!this.attachedTabId) {
+      this.logger.log('[TabHandlers] No tab attached to focus');
+      return { success: false, error: 'No tab attached' };
+    }
+
+    try {
+      // Get the tab to find its window
+      const tab = await this.browser.tabs.get(this.attachedTabId);
+
+      // Activate the tab
+      await this.browser.tabs.update(this.attachedTabId, { active: true });
+
+      // Focus the window
+      if (tab.windowId) {
+        await this.browser.windows.update(tab.windowId, { focused: true });
+      }
+
+      this.logger.log(`[TabHandlers] Focused tab ${this.attachedTabId}`);
+
+      return {
+        success: true,
+        tab: {
+          id: this.attachedTabId,
+          title: tab.title,
+          url: tab.url
+        }
+      };
+    } catch (error) {
+      this.logger.log('[TabHandlers] Failed to focus tab:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Handle tab closed event (called when tab is closed externally)
    */
   async handleTabClosed(tabId) {
