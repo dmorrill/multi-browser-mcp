@@ -227,6 +227,44 @@ claude  # Gets port 5557, session ID "d1e5"
 
 The extension automatically discovers new MCP servers and creates isolated tab contexts for each.
 
+### Focus Tab Command
+
+When you have multiple sessions running, use `browser_tabs` with `action: "focus"` to bring your session's tab to the foreground:
+
+```
+You: "Focus my tab"
+Claude: *activates the attached tab and brings its window to front*
+```
+
+This is helpful when you've lost track of which Chrome tab belongs to which terminal.
+
+### Sessions Management
+
+Use `browser_sessions` to list and manage all active sessions:
+
+```
+You: "List all browser sessions"
+Claude: *shows all active sessions with their ports and attached tabs*
+
+### Browser Sessions
+
+**Total:** 3 active session(s)
+**Current session:** Port 5555
+
+  🟢 **Port 5555** (Session: a3f9)
+     Tab #123: Dashboard - My App
+
+  🟢 **Port 5556** (Session: b7c2)
+     Tab #456: GitHub Pull Requests
+
+  🟢 **Port 5557** (Session: d1e5)
+     Tab #789: Stripe Dashboard
+```
+
+**Cleanup options:**
+- `browser_sessions` with `action: "close"` and `port: 5556` - Close a specific session's tab
+- `browser_sessions` with `action: "close_all"` - Close all other sessions' tabs (keeps your current one)
+
 ### Disabling Multi-Session Mode
 
 To return to single-session mode:
@@ -395,7 +433,8 @@ The MCP server provides these tools to AI assistants:
 - `auth` - Login to PRO account (for cloud relay features)
 
 ### Tab Management
-- `browser_tabs` - List, create, attach to, or close browser tabs
+- `browser_tabs` - List, create, attach to, close, or **focus** browser tabs
+- `browser_sessions` - List all active sessions, close specific session tabs, or close all other sessions (multi-session mode only)
 
 ### Navigation
 - `browser_navigate` - Navigate to a URL
